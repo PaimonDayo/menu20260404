@@ -5,8 +5,8 @@
   --color-track: #ef4444;
 }
 
-body {
-  background-color: #f1f5f9;
+html, body {
+  background-color: #2563eb;
   font-family: 'Inter', 'Noto Sans JP', sans-serif;
 }
 
