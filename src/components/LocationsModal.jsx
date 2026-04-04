@@ -64,18 +64,30 @@ export default function LocationsModal({ onClose }) {
                                     )}
                                 </div>
 
-                                {/* Map Link */}
+                                {/* Map Links */}
                                 {info.url && (
-                                    <a
-                                        href={info.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="mt-4 flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg bg-slate-50 text-slate-700 text-sm font-semibold hover:bg-blue-50 hover:text-blue-600 transition-colors border border-slate-200"
-                                    >
-                                        <Map size={14} />
-                                        Google Maps で確認
-                                        <ExternalLink size={14} className="opacity-50" />
-                                    </a>
+                                    <div className="flex gap-2 mt-4">
+                                        <a
+                                            href={info.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-blue-50 hover:text-blue-600 transition-colors border border-slate-200"
+                                        >
+                                            <Map size={14} />
+                                            Google Maps
+                                            <ExternalLink size={12} className="opacity-50" />
+                                        </a>
+                                        <a
+                                            href={`https://maps.apple.com/?q=${encodeURIComponent(info.name)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 transition-colors border border-slate-200"
+                                        >
+                                            <MapPin size={14} />
+                                            Apple Maps
+                                            <ExternalLink size={12} className="opacity-50" />
+                                        </a>
+                                    </div>
                                 )}
                             </div>
                         );

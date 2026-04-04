@@ -193,16 +193,28 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
                   )}
                 </div>
                 {locationDetails[item.location].url && (
-                  <a
-                    href={locationDetails[item.location].url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
-                  >
-                    <Map size={14} />
-                    Google Maps で確認
-                    <ExternalLink size={14} className="opacity-40" />
-                  </a>
+                  <div className="flex gap-2">
+                    <a
+                      href={locationDetails[item.location].url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                    >
+                      <Map size={14} />
+                      Google Maps
+                      <ExternalLink size={12} className="opacity-40" />
+                    </a>
+                    <a
+                      href={`https://maps.apple.com/?q=${encodeURIComponent(locationDetails[item.location].name)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                    >
+                      <MapPin size={14} />
+                      Apple Maps
+                      <ExternalLink size={12} className="opacity-40" />
+                    </a>
+                  </div>
                 )}
               </div>
             )}

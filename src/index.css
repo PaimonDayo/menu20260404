@@ -6,8 +6,9 @@
 }
 
 html, body {
-  background-color: #2563eb;
+  background: linear-gradient(to right, #2563eb, #1d4ed8, #4338ca);
   font-family: 'Inter', 'Noto Sans JP', sans-serif;
+  height: 100%;
 }
 
 .tab-scroll::-webkit-scrollbar {
