@@ -1,10 +1,23 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="url(#paint0_linear)"/>
-  <path d="M298.667 192H215.111L192 284.444H234.667L213.333 362.667L320 256H277.333L298.667 192Z" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" fill="url(#bg-gradient)"/>
+  
+  <!-- Stopwatch Body -->
+  <circle cx="256" cy="286" r="140" stroke="white" stroke-width="36" />
+  
+  <!-- Stopwatch Top Button -->
+  <rect x="232" y="86" width="48" height="40" rx="8" fill="white" />
+  <rect x="206" y="56" width="100" height="24" rx="12" fill="white" />
+  
+  <!-- Stopwatch Angled Button -->
+  <path d="M366.5 160.5L392 135C396.418 130.582 403.582 130.582 408 135L421 148C425.418 152.418 425.418 159.582 421 164L395.5 189.5L366.5 160.5Z" fill="white" />
+  
+  <!-- Inner Speed / Lightning Bolt -->
+  <path d="M276 196H216L186 286H236L210 372L326 266H276L296 196Z" fill="white" />
+  
   <defs>
-    <linearGradient id="paint0_linear" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg-gradient" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
       <stop stop-color="#2563EB"/>
-      <stop offset="1" stop-color="#4338CA"/>
+      <stop offset="1" stop-color="#3730A3"/>
     </linearGradient>
   </defs>
 </svg>
