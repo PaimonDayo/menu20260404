@@ -26,6 +26,7 @@ export const locationDetails = {
         ],
         fee: null,
         url: 'https://maps.app.goo.gl/GYYNeaxw1dZ6gF2x7?g_st=ic',
+        appleQuery: '東京農工大学 府中キャンパス'
     },
     '工部': {
         name: '工学部トレーニングルーム・グラウンド',
@@ -34,6 +35,7 @@ export const locationDetails = {
         ],
         fee: null,
         url: 'https://maps.app.goo.gl/bgkgVcUe5Gx7Dde19?g_st=ipc',
+        appleQuery: '東京農工大学 小金井キャンパス'
     },
     '府中': {
         name: '府中市民陸上競技場',
@@ -77,6 +79,7 @@ export const locationDetails = {
         ],
         fee: '無し',
         url: 'https://maps.app.goo.gl/TYtmyjJD8RWGxiTp8?g_st=com.google.maps.preview.copy',
+        appleQuery: '済美山運動場'
     },
     '織田': {
         name: '代々木公園陸上競技場 (織田フィールド)',
@@ -87,6 +90,7 @@ export const locationDetails = {
         ],
         fee: null,
         url: 'https://maps.app.goo.gl/x8o7mC4iXq4V9gTj9',
+        appleQuery: '代々木公園陸上競技場'
     }
 };
 

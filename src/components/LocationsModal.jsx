@@ -78,7 +78,7 @@ export default function LocationsModal({ onClose }) {
                                             <ExternalLink size={12} className="opacity-50" />
                                         </a>
                                         <a
-                                            href={`https://maps.apple.com/?q=${encodeURIComponent(info.name)}`}
+                                            href={`https://maps.apple.com/?q=${encodeURIComponent(info.appleQuery || info.name)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-100 transition-colors border border-slate-200"
