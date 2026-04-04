@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #3b82f6;
+  --color-track: #ef4444;
+}
+
+body {
+  background-color: #f1f5f9;
+  font-family: 'Inter', 'Noto Sans JP', sans-serif;
+}
+
+.tab-scroll::-webkit-scrollbar {
+  display: none;
+}
