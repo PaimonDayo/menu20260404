@@ -40,8 +40,9 @@ function classifySessions(sessions) {
     .filter(s => s.date < TODAY_ISO)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  const nextItem   = futureItems[0] ?? null;
-  const restFuture = futureItems.slice(1);
+  // 今日があれば「次の予定」という表記はいらないので、全て restFuture に入れる
+  const nextItem   = todayItems.length === 0 ? (futureItems[0] ?? null) : null;
+  const restFuture = todayItems.length === 0 ? futureItems.slice(1) : futureItems;
 
   return { todayItems, nextItem, restFuture, pastItems };
 }
