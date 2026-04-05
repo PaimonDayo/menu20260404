@@ -144,7 +144,7 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto">
                     {/* Weekday labels */}
-                    <div className="grid grid-cols-7 px-4 mb-1 pt-4">
+                    <div className="grid grid-cols-7 px-2 mb-1 pt-4">
                         {WEEKDAYS.map((w, i) => (
                             <div key={w} className={`text-center text-xs font-semibold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-slate-400'}`}>
                                 {w}
@@ -153,9 +153,9 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                     </div>
 
                     {/* Dates */}
-                    <div className="grid grid-cols-7 px-4 pb-4 gap-y-1">
+                    <div className="grid grid-cols-7 px-2 pb-4 gap-y-1">
                         {cells.map((d, i) => {
-                            if (!d) return <div key={`empty-${i}`} className="min-h-[60px]" />;
+                            if (!d) return <div key={`empty-${i}`} className="h-[88px]" />;
                             const ds = dateStr(d);
                             const info = activitiesMap.get(ds);
                             const hasActivities = !!info;
@@ -171,23 +171,23 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                 <button
                                     key={ds}
                                     onClick={() => hasActivities && onSelectDate(ds)}
-                                    className={`relative flex flex-col items-center py-2 rounded-xl transition-all min-h-[60px]
+                                    className={`relative flex flex-col items-center pt-2.5 pb-1 rounded-xl transition-all h-[88px] overflow-hidden
                                       ${hasActivities ? 'cursor-pointer ' + hoverClass : 'cursor-default'}
                                     `}
                                 >
-                                    <div className={`flex items-center justify-center w-7 h-7 rounded-full mb-1 text-xs font-bold transition-transform active:scale-95
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-full mb-1.5 text-base font-black transition-transform active:scale-95
                                       ${isToday ? 'bg-blue-600 text-white shadow-md' : dow === 0 ? 'text-red-500' : dow === 6 ? 'text-blue-500' : 'text-slate-500'}
                                     `}>
                                         {d}
                                     </div>
                                     
-                                    <div className="flex flex-col items-center gap-0.5 w-full">
+                                    <div className="flex flex-col items-center gap-0.5 w-full flex-1 min-h-0">
                                         {info?.names && info.names.length > 0 && (
-                                            <div className="flex flex-col gap-0.5 w-full px-0.5 overflow-hidden">
+                                            <div className="flex flex-col gap-0.5 w-full px-1 overflow-hidden">
                                                 {info.names.slice(0, 2).map((evt, idx) => (
                                                     <div 
                                                         key={idx} 
-                                                        className={`text-[8px] leading-[10px] truncate w-full text-center font-bold px-0.5 rounded-[2px]
+                                                        className={`text-[10px] leading-[12px] truncate w-full text-center font-bold px-1 py-0.5 rounded-[2px]
                                                             ${isToday ? 'bg-white/20 text-white' : evt.type === 'event' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-teal-100 text-teal-700'}
                                                         `}
                                                     >
@@ -195,7 +195,7 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                                     </div>
                                                 ))}
                                                 {info.names.length > 2 && (
-                                                    <div className={`text-[7px] leading-[8px] text-center font-black ${isToday ? 'text-white' : 'text-slate-400'}`}>
+                                                    <div className={`text-[10px] leading-[12px] text-center font-black ${isToday ? 'text-white' : 'text-slate-400'}`}>
                                                         +{info.names.length - 2}
                                                     </div>
                                                 )}
@@ -203,9 +203,9 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                         )}
                                         {hasActivities && (!info?.names || info.names.length === 0) && (
                                             <div className="flex items-center gap-0.5 mt-0.5">
-                                                {info.hasPractice && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'}`} />}
-                                                {info.hasEvent && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-fuchsia-500'}`} />}
-                                                {info.hasRecord && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white' : 'bg-teal-500'}`} />}
+                                                {info.hasPractice && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'}`} />}
+                                                {info.hasEvent && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-fuchsia-500'}`} />}
+                                                {info.hasRecord && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-teal-500'}`} />}
                                             </div>
                                         )}
                                     </div>
