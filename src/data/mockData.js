@@ -1,4 +1,4 @@
-export const months = ['3月', '4月', '5月', '6月', '7月'];
+export const months = ['3月', '4月', '5月', '6月', '7月', '日程一覧'];
 
 // 場所ごとの色定義（インラインスタイル用）
 export const locationStyles = {
@@ -89,7 +89,7 @@ export const locationDetails = {
             '代々木八幡駅(小田急線)から徒歩9分'
         ],
         fee: null,
-        url: 'https://maps.app.goo.gl/x8o7mC4iXq4V9gTj9',
+        url: 'https://www.google.com/maps/search/?api=1&query=代々木公園陸上競技場',
         appleQuery: '代々木公園陸上競技場'
     }
 };
@@ -283,6 +283,51 @@ LSDラン 60分
         },
     ],
 };
+
+export const mockScheduleData = [
+    {
+        id: 'mock-s-1',
+        type: 'event', // 大会・行事
+        date: '2026-05-21',
+        endDate: '2026-05-24',
+        displayDate: '5/21～5/24',
+        name: '関東インカレ',
+        location: '国立競技場',
+        dayOfWeek: '',
+    },
+    {
+        id: 'mock-s-2',
+        type: 'event', // 大会・行事
+        date: '2026-04-19',
+        endDate: null,
+        displayDate: '4/19',
+        name: '春季オープン',
+        location: '武蔵野',
+        dayOfWeek: '',
+    },
+    {
+        id: 'mock-s-3',
+        type: 'record', // 記録会
+        date: '2026-04-04',
+        endDate: null,
+        displayDate: '4/4',
+        name: '長距離記録会 第1回',
+        entryPeriod: '2/25〜3/11',
+        location: '',
+        dayOfWeek: '',
+    },
+    {
+        id: 'mock-s-4',
+        type: 'record', // 記録会
+        date: '2026-05-18',
+        endDate: null,
+        displayDate: '5/18',
+        name: '長距離記録会 第2回',
+        entryPeriod: '4/1〜4/15',
+        location: '',
+        dayOfWeek: '',
+    }
+];
 
 export const locationColors = {
     'トラック': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200' },

@@ -76,6 +76,99 @@ function formatTime(raw) {
   return raw.trim().replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
 }
 
+/**
+ * 日程一覧の日付文字列（「5/21～5/24」「11/13～15」「1/17」等）をパースし、
+ * YYYY-MM-DD 形式の開始日と終了日を返す。
+ */
+function parseScheduleRange(yearStr, dateStr) {
+  if (!dateStr) return null;
+  const normalized = dateStr.replace(/[〜~]/g, '～').replace(/\s+/g, '');
+  const parts = normalized.split('～');
+  
+  const startMatch = parts[0].match(/(\d{1,2})\/(\d{1,2})/);
+  if (!startMatch) return null;
+  
+  const startMonth = startMatch[1];
+  const startDay = startMatch[2];
+  const startIso = `${yearStr}-${startMonth.padStart(2, '0')}-${startDay.padStart(2, '0')}`;
+  
+  const getW = (iso) => {
+    const d = new Date(iso);
+    return ['日','月','火','水','木','金','土'][d.getDay()];
+  };
+  const startW = getW(startIso);
+  
+  let endIso = null;
+  let endW = '';
+  if (parts.length > 1 && parts[1]) {
+    const endMatch = parts[1].match(/(\d{1,2})\/(\d{1,2})/);
+    if (endMatch) {
+      endIso = `${yearStr}-${endMatch[1].padStart(2, '0')}-${endMatch[2].padStart(2, '0')}`;
+      endW = getW(endIso);
+    } else {
+      const endDayMatch = parts[1].match(/(\d{1,2})/);
+      if (endDayMatch) {
+        endIso = `${yearStr}-${startMonth.padStart(2, '0')}-${endDayMatch[1].padStart(2, '0')}`;
+        endW = getW(endIso);
+      }
+    }
+  }
+  
+  let displayDate = `${startMonth}月${startDay}日（${startW}）`;
+  if (endIso) {
+    const endM = parseInt(endIso.split('-')[1], 10);
+    const endD = parseInt(endIso.split('-')[2], 10);
+    const endPart = endM === parseInt(startMonth, 10) ? `${endD}日（${endW}）` : `${endM}月${endD}日（${endW}）`;
+    displayDate += `～${endPart}`;
+  }
+  
+  return { startDate: startIso, endDate: endIso, displayDate };
+}
+
+/**
+ * エントリー期間のステータスを判定して返す。
+ * periodStr: "2/25〜3/11"
+ * itemYear: その行事自体の年（2026など）
+ * returns: 'active' (募集中), 'upcoming' (開始前), 'past' (終了), or null
+ */
+export function getEntryPeriodStatus(periodStr, itemYear) {
+  if (!periodStr) return null;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const refYear = itemYear ? parseInt(itemYear) : currentYear;
+  
+  const normalized = periodStr.replace(/[〜~]/g, '～').replace(/\s+/g, '');
+  const parts = normalized.split('～');
+  if (parts.length < 2) return null;
+
+  const parseMD = (s, baseYear) => {
+    const m = s.match(/(\d{1,2})\/(\d{1,2})/);
+    if (!m) return null;
+    return new Date(baseYear, parseInt(m[1]) - 1, parseInt(m[2]));
+  };
+
+  let start = parseMD(parts[0], refYear);
+  let end = parseMD(parts[1], refYear);
+  
+  if (!start || !end) return null;
+  
+  if (start > end) {
+    start = parseMD(parts[0], refYear - 1);
+  }
+  
+  // 今日の日付（時刻なし）
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  
+  if (t < start) return 'upcoming';
+  if (t > end) return 'past';
+  return 'active';
+}
+
+/** 既存の呼び出し元への互換性維持（募集中かどうか） */
+export function isWithinEntryPeriod(periodStr, itemYear) {
+  return getEntryPeriodStatus(periodStr, itemYear) === 'active';
+}
+
 // ── メインのフェッチ関数 ──────────────────────────────────────────────────────
 
 /**
@@ -130,21 +223,110 @@ export async function fetchPracticeData(month) {
       const cVal     = (row[2] ?? '').trim();   // C: 時間 or 試合名
       const location = (row[3] ?? '').trim();   // D: 場所
       const menu     = (row[4] ?? '').trim();   // E: メニュー
-      const isMatch  = cVal && !/^\d{1,2}:\d{2}$/.test(cVal); // 時刻以外 = 試合名
 
-      return location || menu || isMatch;
+      return location || menu;
     })
     .map((row, i) => ({
       id:        i + 1,
       date:      parseSheetDate(row[0] ?? ''),
       dayOfWeek: (row[1] ?? '').trim(),
-      time:      formatTime(row[2] ?? ''),       // 試合名もここに入る
+      time:      formatTime(row[2] ?? ''),
       location:  (row[3] ?? '').trim(),
       weather:   '',
       menu:      (row[4] ?? '').replace(/\\n/g, '\n'),
       pace:      (row[5] ?? '').replace(/\\n/g, '\n'),
       notes:     (row[6] ?? '').replace(/\\n/g, '\n'),
     }));
+}
+
+/**
+ * 日程一覧（行事・大会および記録会）を取得する。
+ */
+export async function fetchScheduleData() {
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
+    return [];
+  }
+
+  // GID不明の場合はシート名フォールバック
+  const sheetName = encodeURIComponent('日程一覧');
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    
+    const contentType = res.headers.get('content-type') ?? '';
+    const text = await res.text();
+    if (contentType.includes('text/html') || text.trimStart().startsWith('<!DOCTYPE')) {
+      return [];
+    }
+
+    const allRows = parseCsv(text);
+    // 3行目（インデックス2）からデータ開始
+    const dataRows = allRows.slice(2);
+    
+    const schedules = [];
+    let idCounter = 10000; // 練習メニューのIDと被らないように大きめの数
+    let lastSeenYear = '';
+
+    for (const row of dataRows) {
+      const yearRaw = (row[0] ?? '').trim();
+      if (yearRaw && /^\d{4}$/.test(yearRaw)) {
+        lastSeenYear = yearRaw;
+      }
+      const year = lastSeenYear;
+      
+      if (!year) continue;
+
+      // --- 大会・行事のパース (B, C, D) ---
+      const eventDateRaw = (row[1] ?? '').trim();
+      const eventName = (row[2] ?? '').trim();
+      const eventLocation = (row[3] ?? '').trim();
+
+      if (eventName && eventDateRaw) {
+        const parsed = parseScheduleRange(year, eventDateRaw);
+        if (parsed) {
+          schedules.push({
+            id: ++idCounter,
+            type: 'event', // 大会・行事
+            date: parsed.startDate,
+            endDate: parsed.endDate,
+            displayDate: parsed.displayDate,
+            name: eventName,
+            location: eventLocation,
+            dayOfWeek: '', // 日程一覧からは取れないので空
+          });
+        }
+      }
+
+      // --- 長距離記録会のパース (F, G, H) ---
+      const recordName = (row[5] ?? '').trim();
+      const recordDateRaw = (row[6] ?? '').trim();
+      const entryPeriod = (row[7] ?? '').trim();
+
+      if (recordName && recordDateRaw) {
+        const parsed = parseScheduleRange(year, recordDateRaw);
+        if (parsed) {
+          schedules.push({
+            id: ++idCounter,
+            type: 'record', // 記録会
+            date: parsed.startDate,
+            endDate: parsed.endDate,
+            displayDate: parsed.displayDate,
+            name: recordName,
+            entryPeriod: entryPeriod,
+            location: '', // 記録会には場所がない
+            dayOfWeek: '',
+          });
+        }
+      }
+    }
+    
+    return schedules.sort((a, b) => a.date.localeCompare(b.date));
+  } catch (e) {
+    console.warn('日程一覧の取得に失敗しました', e);
+    return [];
+  }
 }
 
 export function hasConfig() {
