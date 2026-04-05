@@ -31,7 +31,7 @@ function getMatchName(time) {
 }
 
 /** セッションリストを 今日 / 次 / 残り未来 / 過去 に分類 */
-function classifySessions(sessions) {
+function classifySessions(sessions, globalTodayExists, globalNextItemId) {
   const todayItems  = sessions.filter(s => s.date === TODAY_ISO);
   const futureItems = sessions
     .filter(s => s.date > TODAY_ISO)
@@ -40,9 +40,20 @@ function classifySessions(sessions) {
     .filter(s => s.date < TODAY_ISO)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // 今日があれば「次の予定」という表記はいらないので、全て restFuture に入れる
-  const nextItem   = todayItems.length === 0 ? (futureItems[0] ?? null) : null;
-  const restFuture = todayItems.length === 0 ? futureItems.slice(1) : futureItems;
+  // 「次の予定」として扱うのは：
+  // 1. グローバル（全データ）で今日の予定が1つもない
+  // 2. そのアイテムがグローバルで最も近い未来の予定である
+  // という条件を満たす時のみ。
+  let nextItem = null;
+  let restFuture = futureItems;
+
+  if (!globalTodayExists && globalNextItemId) {
+    const foundIdx = futureItems.findIndex(s => s.id === globalNextItemId);
+    if (foundIdx !== -1) {
+      nextItem = futureItems[foundIdx];
+      restFuture = [...futureItems.slice(0, foundIdx), ...futureItems.slice(foundIdx + 1)];
+    }
+  }
 
   return { todayItems, nextItem, restFuture, pastItems };
 }
@@ -451,7 +462,16 @@ export default function App() {
     });
   }
 
-  const { todayItems, nextItem, restFuture, pastItems } = classifySessions(displaySessions);
+  const { globalTodayExists, globalNextItemId } = (() => {
+    const all = allSessionsForCalendar;
+    const todayExists = all.some(s => s.date === TODAY_ISO);
+    const next = all
+      .filter(s => s.date > TODAY_ISO)
+      .sort((a, b) => a.date.localeCompare(b.date))[0];
+    return { globalTodayExists: todayExists, globalNextItemId: next?.id };
+  })();
+
+  const { todayItems, nextItem, restFuture, pastItems } = classifySessions(displaySessions, globalTodayExists, globalNextItemId);
   const hasContent = displaySessions.length > 0;
 
   function handleSelectDate(dateStr) {
