@@ -181,9 +181,10 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                         {d}
                                     </div>
                                     
-                                    <div className="flex flex-col items-center gap-0.5 w-full flex-1 min-h-0">
+                                    <div className="flex flex-col items-center w-full flex-1 min-h-0">
+                                        {/* Name labels */}
                                         {info?.names && info.names.length > 0 && (
-                                            <div className="flex flex-col gap-0.5 w-full px-1 overflow-hidden">
+                                            <div className="flex flex-col gap-0.5 w-full px-1 mb-1 overflow-hidden">
                                                 {info.names.slice(0, 2).map((evt, idx) => (
                                                     <div 
                                                         key={idx} 
@@ -201,13 +202,20 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                                 )}
                                             </div>
                                         )}
-                                        {hasActivities && (!info?.names || info.names.length === 0) && (
-                                            <div className="flex items-center gap-0.5 mt-0.5">
-                                                {info.hasPractice && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-blue-500'}`} />}
-                                                {info.hasEvent && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-fuchsia-500'}`} />}
-                                                {info.hasRecord && <span className={`w-2 h-2 rounded-full ${isToday ? 'bg-white' : 'bg-teal-500'}`} />}
-                                            </div>
-                                        )}
+                                        
+                                        {/* Status Dots (at bottom if labels exist, otherwise centered) */}
+                                        <div className={`flex items-center gap-1 ${info?.names && info.names.length > 0 ? 'mt-auto pb-1' : 'mt-0.5'}`}>
+                                            {info?.hasPractice && (
+                                                <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-blue-500'}`} />
+                                            )}
+                                            {/* Labelsがない時だけ補助的に他のドットも出す */}
+                                            {(!info?.names || info.names.length === 0) && (
+                                                <>
+                                                    {info?.hasEvent && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-fuchsia-500'}`} />}
+                                                    {info?.hasRecord && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-teal-500'}`} />}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </button>
                             );
