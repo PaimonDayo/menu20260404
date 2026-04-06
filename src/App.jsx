@@ -301,11 +301,15 @@ export default function App() {
   useEffect(() => {
     async function preloadAll() {
       const targetMonths = months.filter(m => m !== '日程一覧');
+      const isBeginningOfMonth = new Date().getDate() <= 3;
+      const ts = isBeginningOfMonth ? Date.now() : null;
+
       for (const m of targetMonths) {
-        if (!sessionCache.current[m]) {
+        // 月初めかつ初回のみキャッシュを無視して強制リロード
+        if (!sessionCache.current[m] || isBeginningOfMonth) {
           try {
             if (hasConfig()) {
-              const d = await fetchPracticeData(m);
+              const d = await fetchPracticeData(m, ts);
               sessionCache.current[m] = d;
             } else {
               sessionCache.current[m] = [...(mockData[m] ?? [])];
@@ -323,34 +327,38 @@ export default function App() {
     preloadAll();
   }, [activeMonth, practiceSessions.length]);
 
-  // 初回に日程一覧を一括フェッチする
-  useEffect(() => {
-    async function initSchedule() {
-      let sched = [];
-      if (hasConfig()) {
-        try {
-          sched = await fetchScheduleData();
-        } catch(e) {
-          sched = mockScheduleData;
-        }
-      } else {
+  const loadSchedule = useCallback(async (timestamp) => {
+    setLoading(true);
+    let sched = [];
+    if (hasConfig()) {
+      try {
+        sched = await fetchScheduleData(timestamp);
+      } catch(e) {
         sched = mockScheduleData;
       }
-      
-      // エントリステータスの付与
-      const updated = sched.map(s => {
-        const year = s.date?.split('-')[0];
-        const status = s.type === 'record' ? getEntryPeriodStatus(s.entryPeriod, year) : null;
-        return {
-          ...s,
-          entryStatus: status,
-          isRecruiting: status === 'active'
-        };
-      });
-      setScheduleSessions(updated);
+    } else {
+      sched = mockScheduleData;
     }
-    initSchedule();
+    
+    // エントリステータスの付与
+    const updated = sched.map(s => {
+      const year = s.date?.split('-')[0];
+      const status = s.type === 'record' ? getEntryPeriodStatus(s.entryPeriod, year) : null;
+      return {
+        ...s,
+        entryStatus: status,
+        isRecruiting: status === 'active'
+      };
+    });
+    setScheduleSessions(updated);
+    setLoading(false);
   }, []);
+
+  // 初回に日程一覧を一括フェッチする
+  useEffect(() => {
+    const isBeginningOfMonth = new Date().getDate() <= 3;
+    loadSchedule(isBeginningOfMonth ? Date.now() : null);
+  }, [loadSchedule]);
 
   const loadData = useCallback(async (month) => {
     if (month === '日程一覧') {
@@ -384,8 +392,12 @@ export default function App() {
   }, []);
 
   async function handleManualRefresh() {
-    delete sessionCache.current[activeMonth]; // 現在の月のキャッシュを破棄
-    await loadData(activeMonth); // 再読み込み
+    if (activeMonth === '日程一覧') {
+      await loadSchedule(Date.now());
+    } else {
+      delete sessionCache.current[activeMonth]; // 現在の月のキャッシュを破棄
+      await loadData(activeMonth); // 再読み込み
+    }
   }
 
   // タブ切替時に先頭にスクロール

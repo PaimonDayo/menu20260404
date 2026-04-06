@@ -176,20 +176,21 @@ export function isWithinEntryPeriod(periodStr, itemYear) {
  * GIDが config.js に登録されている場合は GID を使用（型推論なし）。
  * 未登録の場合はシート名フォールバック（一部ブラウザ・環境で動作しない可能性あり）。
  */
-export async function fetchPracticeData(month) {
+export async function fetchPracticeData(month, timestamp) {
   if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
     throw new Error('config.js にスプレッドシートIDが設定されていません。');
   }
 
   const gid = SHEET_GIDS[month];
+  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
   let url;
   if (gid != null) {
     // GIDが分かっている場合: 型推論なしの生CSVエクスポート
-    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&gid=${gid}`;
+    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&gid=${gid}${cacheBuster}`;
   } else {
     // GID不明の場合: シート名フォールバック（gviz は使わない）
     const sheetName = encodeURIComponent(`${month}メニュー`);
-    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}`;
+    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}${cacheBuster}`;
   }
 
   const res = await fetch(url);
@@ -242,14 +243,15 @@ export async function fetchPracticeData(month) {
 /**
  * 日程一覧（行事・大会および記録会）を取得する。
  */
-export async function fetchScheduleData() {
+export async function fetchScheduleData(timestamp) {
   if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
     return [];
   }
 
   // GID不明の場合はシート名フォールバック
   const sheetName = encodeURIComponent('日程一覧');
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}`;
+  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}${cacheBuster}`;
 
   try {
     const res = await fetch(url);
