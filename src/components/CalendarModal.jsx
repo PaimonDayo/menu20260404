@@ -189,14 +189,14 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                                     <div 
                                                         key={idx} 
                                                         className={`text-[10px] leading-[12px] truncate w-full text-center font-bold px-1 py-0.5 rounded-[2px]
-                                                            ${isToday ? 'bg-white/20 text-white' : evt.type === 'event' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-teal-100 text-teal-700'}
+                                                            ${evt.type === 'event' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-teal-100 text-teal-700'}
                                                         `}
                                                     >
                                                         {evt.text}
                                                     </div>
                                                 ))}
                                                 {info.names.length > 2 && (
-                                                    <div className={`text-[10px] leading-[12px] text-center font-black ${isToday ? 'text-white' : 'text-slate-400'}`}>
+                                                    <div className="text-[10px] leading-[12px] text-center font-black text-slate-400">
                                                         +{info.names.length - 2}
                                                     </div>
                                                 )}
@@ -206,13 +206,13 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
                                         {/* Status Dots (at bottom if labels exist, otherwise centered) */}
                                         <div className={`flex items-center gap-1 ${info?.names && info.names.length > 0 ? 'mt-auto pb-1' : 'mt-0.5'}`}>
                                             {info?.hasPractice && (
-                                                <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-blue-500'}`} />
+                                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-sm" />
                                             )}
                                             {/* Labelsがない時だけ補助的に他のドットも出す */}
                                             {(!info?.names || info.names.length === 0) && (
                                                 <>
-                                                    {info?.hasEvent && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-fuchsia-500'}`} />}
-                                                    {info?.hasRecord && <span className={`w-1.5 h-1.5 rounded-full ${isToday ? 'bg-white shadow-sm' : 'bg-teal-500'}`} />}
+                                                    {info?.hasEvent && <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500 shadow-sm" />}
+                                                    {info?.hasRecord && <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shadow-sm" />}
                                                 </>
                                             )}
                                         </div>
