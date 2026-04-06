@@ -6,8 +6,8 @@ export default function LocationsModal({ onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl w-full max-w-sm max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-3xl w-[92vw] max-w-[390px] max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
                 {/* Header */}
                 <div className="shrink-0 flex items-center justify-between px-5 pt-6 pb-4 bg-white border-b border-slate-50">
                     <div className="flex items-center gap-2">

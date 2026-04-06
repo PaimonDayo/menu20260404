@@ -94,7 +94,7 @@ export default function CalendarModal({ sessions, onClose, onSelectDate, activeM
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-2xl w-full max-w-sm mx-auto shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="relative bg-white rounded-3xl w-[92vw] max-w-[390px] max-h-[85vh] shadow-2xl flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="relative z-30 flex items-center justify-between px-4 pt-6 pb-4 border-b border-slate-50 shrink-0">
                     <div className="flex items-center gap-2">
