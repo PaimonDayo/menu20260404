@@ -90,7 +90,11 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
     }
   }, [scrollRef, item.id]);
 
-  const loc = locationStyles[item.location] ?? defaultLocationStyle;
+  const actualLocation = item.location ? (item.location.includes('→') ? item.location.split('→').pop().trim() : item.location) : '';
+  const loc = locationStyles[actualLocation] ?? defaultLocationStyle;
+  const isChangedLocation = item.location?.includes('変更') || item.location?.includes('→');
+  const badgeStyle = isChangedLocation ? { bg: '#FEF2F2', border: '#EF4444', text: '#B91C1C' } : loc;
+  
   const matchName = getMatchName(item.time);
   const displayTime = matchName ? null : item.time;
 
@@ -160,7 +164,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
               {item.location && (
                 <span
                   className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border"
-                  style={{ backgroundColor: loc.bg, borderColor: loc.border, color: loc.text }}
+                  style={{ backgroundColor: badgeStyle.bg, borderColor: badgeStyle.border, color: badgeStyle.text }}
                 >
                   <MapPin size={10} />
                   {item.location}
@@ -213,33 +217,33 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
             )}
 
             {/* 場所・アクセス */}
-            {item.location && locationDetails[item.location] && (
+            {item.location && locationDetails[actualLocation] && (
               <div className="mt-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
                 <div className="flex items-center gap-1.5 mb-2">
                   <MapPin size={14} className="opacity-60" style={{ color: loc.text }} />
                   <span className="text-xs font-bold tracking-wider uppercase opacity-60" style={{ color: loc.text }}>アクセス・マップ</span>
                 </div>
                 <div className="text-sm text-slate-700 leading-relaxed mb-3">
-                  <p className="font-semibold text-[15px] mb-1">{locationDetails[item.location].name}</p>
-                  {locationDetails[item.location].access?.length > 0 && (
+                  <p className="font-semibold text-[15px] mb-1">{locationDetails[actualLocation].name}</p>
+                  {locationDetails[actualLocation].access?.length > 0 && (
                     <div className="flex flex-col gap-1 mb-1.5">
-                      {locationDetails[item.location].access.map((acc, i) => (
+                      {locationDetails[actualLocation].access.map((acc, i) => (
                         <p key={i} className="text-slate-500 text-xs bg-white self-start px-1.5 py-0.5 rounded border border-slate-200">
                           {acc}
                         </p>
                       ))}
                     </div>
                   )}
-                  {locationDetails[item.location].fee && (
+                  {locationDetails[actualLocation].fee && (
                     <p className="text-slate-500 text-xs">
-                      料金: {locationDetails[item.location].fee}
+                      料金: {locationDetails[actualLocation].fee}
                     </p>
                   )}
                 </div>
-                {locationDetails[item.location].url && (
+                {locationDetails[actualLocation].url && (
                   <div className="flex gap-2">
                     <a
-                      href={locationDetails[item.location].url}
+                      href={locationDetails[actualLocation].url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
@@ -249,7 +253,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
                       <ExternalLink size={12} className="opacity-40" />
                     </a>
                     <a
-                      href={locationDetails[item.location].appleUrl || `https://maps.apple.com/?q=${encodeURIComponent(locationDetails[item.location].appleQuery || locationDetails[item.location].name)}`}
+                      href={locationDetails[actualLocation].appleUrl || `https://maps.apple.com/?q=${encodeURIComponent(locationDetails[actualLocation].appleQuery || locationDetails[actualLocation].name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"

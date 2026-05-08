@@ -227,17 +227,27 @@ export async function fetchPracticeData(month, timestamp) {
 
       return location || menu;
     })
-    .map((row, i) => ({
-      id:        i + 1,
-      date:      parseSheetDate(row[0] ?? ''),
-      dayOfWeek: (row[1] ?? '').trim(),
-      time:      formatTime(row[2] ?? ''),
-      location:  (row[3] ?? '').trim(),
-      weather:   '',
-      menu:      (row[4] ?? '').replace(/\\n/g, '\n'),
-      pace:      (row[5] ?? '').replace(/\\n/g, '\n'),
-      notes:     (row[6] ?? '').replace(/\\n/g, '\n'),
-    }));
+    .map((row, i) => {
+      const dateStr = parseSheetDate(row[0] ?? '');
+      let locStr = (row[3] ?? '').trim();
+
+      // 一時的な対応：5/9の練習場所を強制的に上書き
+      if (dateStr === '2026-05-09' && locStr === '済美山') {
+        locStr = '変更:済美山→武蔵野';
+      }
+
+      return {
+        id:        i + 1,
+        date:      dateStr,
+        dayOfWeek: (row[1] ?? '').trim(),
+        time:      formatTime(row[2] ?? ''),
+        location:  locStr,
+        weather:   '',
+        menu:      (row[4] ?? '').replace(/\\n/g, '\n'),
+        pace:      (row[5] ?? '').replace(/\\n/g, '\n'),
+        notes:     (row[6] ?? '').replace(/\\n/g, '\n'),
+      };
+    });
 }
 
 /**
