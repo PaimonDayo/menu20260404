@@ -339,3 +339,116 @@ export async function fetchScheduleData(timestamp) {
 export function hasConfig() {
   return Boolean(SPREADSHEET_ID && SPREADSHEET_ID !== 'ここにスプレッドシートIDを入力');
 }
+
+/**
+ * 全シート名とGIDのリストをhtmlviewから抽出する。
+ * B+数字 または M+数字 で始まるシート（部員個人シート）を自動選別する。
+ */
+export async function fetchSheetList() {
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
+    return [];
+  }
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/htmlview`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`シート一覧の取得に失敗しました (${res.status})`);
+  }
+  const html = await res.text();
+
+  // htmlview 内の JavaScript にあるシート情報を抽出
+  // 例: items.push({name: "B2山田", pageUrl: "...", gid: "755630045", ...})
+  const regex = /items\.push\(\s*({[^}]+})\s*\)/g;
+  const sheets = [];
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    try {
+      const objText = match[1];
+      const nameMatch = /name:\s*"([^"]+)"/.exec(objText);
+      const gidMatch = /gid:\s*"([^"]+)"/.exec(objText);
+      if (nameMatch && gidMatch) {
+        const name = nameMatch[1];
+        const gid = gidMatch[1];
+        // 試験的運用のために B2 で始まるシート名（部員名）のみを抽出
+        if (/^B2/.test(name)) {
+          sheets.push({ name, gid });
+        }
+      }
+    } catch (e) {
+      console.warn('シート情報の抽出に失敗:', e);
+    }
+  }
+  return sheets;
+}
+
+/**
+ * 特定の部員シート（GID）から練習データを取得してパースする。
+ * ヘッダーに '低強度(jog)' または '低強度' が含まれていない場合は短距離とみなし null を返す。
+ */
+export async function fetchMemberPracticeData(gid, timestamp) {
+  if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
+    return null;
+  }
+  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&gid=${gid}${cacheBuster}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`メンバーデータの取得に失敗しました (${res.status})`);
+  }
+  const text = await res.text();
+  const rows = parseCsv(text);
+
+  // 最初の15行からヘッダー行（'低強度' を含む行）を検出
+  const headerIdx = rows.slice(0, 15).findIndex(r => r.some(cell => cell.includes('低強度')));
+  if (headerIdx === -1) {
+    // '低強度' 列がない場合は短距離等とみなし null を返す
+    return null;
+  }
+
+  const header = rows[headerIdx];
+  const jogCol   = header.findIndex(cell => cell.includes('低強度'));
+  const mltCol   = header.findIndex(cell => cell.includes('中強度'));
+  const cvCol    = header.findIndex(cell => cell.includes('高強度'));
+  const speedCol = header.findIndex(cell => cell.includes('解糖系'));
+  const totalCol = header.findIndex(cell => cell.includes('実際の距離'));
+
+  const dataRows = rows.slice(headerIdx + 1);
+  const records = [];
+
+  for (const row of dataRows) {
+    const dateRaw = row[0]?.trim();
+    if (!dateRaw || !/^\d{1,2}\/\d{1,2}/.test(dateRaw)) continue; // 有効な日付形式でなければスキップ
+
+    const dateStr = parseSheetDate(dateRaw); // YYYY-MM-DD 形式にパース
+
+    const parseVal = (val) => {
+      if (!val) return 0;
+      const cleanVal = val.trim().replace(/[^\d.]/g, '');
+      const num = parseFloat(cleanVal);
+      return isNaN(num) ? 0 : num;
+    };
+
+    const jog   = jogCol !== -1 ? parseVal(row[jogCol]) : 0;
+    const mlt   = mltCol !== -1 ? parseVal(row[mltCol]) : 0;
+    const cv    = cvCol !== -1 ? parseVal(row[cvCol]) : 0;
+    const speed = speedCol !== -1 ? parseVal(row[speedCol]) : 0;
+    const total = totalCol !== -1 ? parseVal(row[totalCol]) : (jog + mlt + cv + speed);
+
+    // 感想など (いただいたスプレッドシートの18列目 = index 17)
+    const comment = row.length > 17 ? (row[17]?.trim() ?? '') : '';
+
+    if (total > 0 || jog > 0 || mlt > 0 || cv > 0 || speed > 0) {
+      records.push({
+        date: dateStr,
+        total,
+        jog,
+        mlt,
+        cv,
+        speed,
+        comment
+      });
+    }
+  }
+
+  return records;
+}

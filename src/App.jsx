@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MapPin, Clock, ListChecks, Timer, StickyNote,
-  ChevronDown, ChevronUp, CalendarDays, Zap, Trophy, Map, ExternalLink, RefreshCcw, Flag, CalendarPlus
+  ChevronDown, ChevronUp, CalendarDays, Zap, Trophy, Map, ExternalLink, RefreshCcw, Flag, CalendarPlus, Footprints
 } from 'lucide-react';
 import { months, practiceData as mockData, mockScheduleData, locationStyles, defaultLocationStyle, locationDetails } from './data/mockData';
-import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, isWithinEntryPeriod, hasConfig } from './services/sheetsService';
+import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, isWithinEntryPeriod, hasConfig, fetchSheetList, fetchMemberPracticeData } from './services/sheetsService';
 import CalendarModal from './components/CalendarModal';
 import LocationsModal from './components/LocationsModal';
+import StatsModal from './components/StatsModal';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showLocations, setShowLocations] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const scrollToId = useRef(null);
   const sessionCache = useRef({}); // 月ごとの練習データをキャッシュ
@@ -330,6 +332,81 @@ export default function App() {
     }
     preloadAll();
   }, [activeMonth, practiceSessions.length]);
+
+  // バックグラウンドで部員の走行距離データをプリロードする
+  useEffect(() => {
+    if (!hasConfig()) return;
+
+    async function preloadMemberStats() {
+      const CACHE_KEY = 'tf_member_stats_cache';
+      const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const cachedTs = localStorage.getItem(CACHE_TS_KEY);
+
+      if (cachedData && cachedTs) {
+        // キャッシュが存在する場合、直近1時間以内であれば自動更新はスキップしてキャッシュをそのまま使う
+        const parseDate = (tsStr) => {
+          const now = new Date();
+          const match = tsStr.match(/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+          if (!match) return null;
+          return new Date(now.getFullYear(), parseInt(match[1]) - 1, parseInt(match[2]), parseInt(match[3]), parseInt(match[4]));
+        };
+        const tsDate = parseDate(cachedTs);
+        if (tsDate && (new Date() - tsDate) < 60 * 60 * 1000) { // 1時間以内
+          console.log('Stats cache is fresh (less than 1 hour old), skipping preload.');
+          return;
+        }
+      }
+
+      console.log('Starting background preload of member stats...');
+      try {
+        const sheetList = await fetchSheetList();
+        if (sheetList.length === 0) return;
+
+        // Promise.all を使用して並行フェッチに変更（劇的な高速化）
+        const promises = sheetList.map(async (sheet) => {
+          try {
+            const records = await fetchMemberPracticeData(sheet.gid);
+            if (records !== null) {
+              return {
+                name: sheet.name,
+                gid: sheet.gid,
+                records: records
+              };
+            }
+          } catch (err) {
+            console.warn(`[Preload] メンバー「${sheet.name}」のデータ取得に失敗:`, err);
+          }
+          return null;
+        });
+
+        const results = await Promise.all(promises);
+        const parsedMembers = results.filter(m => m !== null);
+
+        const sorted = parsedMembers.sort((a, b) => a.name.localeCompare(b.name));
+        localStorage.setItem(CACHE_KEY, JSON.stringify(sorted));
+        
+        const nowStr = new Date().toLocaleString('ja-JP', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        localStorage.setItem(CACHE_TS_KEY, nowStr);
+        console.log('Background preload of member stats completed successfully!');
+        
+        // もしすでにStatsModalが開いていたら、データを更新するためにカスタムイベントを発行する
+        window.dispatchEvent(new CustomEvent('tf_stats_cache_updated', { detail: { members: sorted, timestamp: nowStr } }));
+
+      } catch (e) {
+        console.warn('Background stats preload failed:', e);
+      }
+    }
+
+    // アプリ起動3秒後にプリロードを開始（メインの読み込みを邪魔しないため）
+    const timer = setTimeout(preloadMemberStats, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadSchedule = useCallback(async (timestamp) => {
     setLoading(true);
@@ -585,6 +662,10 @@ export default function App() {
                   className={`p-2.5 rounded-full hover:bg-white/20 transition-all text-white/80 hover:text-white ${loading ? 'animate-spin opacity-50' : ''}`} title="最新データを取得">
                   <RefreshCcw size={20} />
                 </button>
+                <button onClick={() => setShowStats(true)}
+                  className="p-2.5 rounded-full hover:bg-white/20 transition-colors text-white/80 hover:text-white" title="走行距離ランキング">
+                  <Footprints size={22} />
+                </button>
                 <button onClick={() => setShowLocations(true)}
                   className="p-2.5 rounded-full hover:bg-white/20 transition-colors text-white/80 hover:text-white" title="場所・アクセス一覧">
                   <Map size={22} />
@@ -692,6 +773,9 @@ export default function App() {
       )}
       {showLocations && (
         <LocationsModal onClose={() => setShowLocations(false)} />
+      )}
+      {showStats && (
+        <StatsModal onClose={() => setShowStats(false)} />
       )}
     </div>
   );

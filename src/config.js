@@ -10,7 +10,12 @@
  * ※ スプレッドシートの共有設定を「リンクを知っている全員が閲覧可能」にしてください。
  *    APIキーは不要です。
  */
-export const SPREADSHEET_ID = '1uAo7E8_rMbUZlml1H0vj119htQeoa2eMWqASUXQTqgg';
+export const SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1uAo7E8_rMbUZlml1H0vj119htQeoa2eMWqASUXQTqgg/edit';
+
+export const SPREADSHEET_ID = (() => {
+  const match = SPREADSHEET_URL.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return match ? match[1] : SPREADSHEET_URL;
+})();
 
 export const SHEET_GIDS = {
   '3月': 678173586,
