@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   MapPin, Clock, ListChecks, Timer, StickyNote,
-  ChevronDown, ChevronUp, CalendarDays, Zap, Trophy, Map, ExternalLink, RefreshCcw, Flag, CalendarPlus, Footprints
+  ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Footprints, CalendarDays as CalendarIcon
 } from 'lucide-react';
 import { months, practiceData as mockData, mockScheduleData, locationStyles, defaultLocationStyle, locationDetails } from './data/mockData';
-import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, isWithinEntryPeriod, hasConfig, fetchSheetList, fetchMemberPracticeData } from './services/sheetsService';
+import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, hasConfig } from './services/sheetsService';
 import CalendarModal from './components/CalendarModal';
 import LocationsModal from './components/LocationsModal';
-import StatsModal from './components/StatsModal';
+import StatsDashboard from './components/StatsDashboard';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,10 +41,6 @@ function classifySessions(sessions, globalTodayExists, globalNextItemId) {
     .filter(s => s.date < TODAY_ISO)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // 「次の予定」として扱うのは：
-  // 1. グローバル（全データ）で今日の予定が1つもない
-  // 2. そのアイテムがグローバルで最も近い未来の予定である
-  // という条件を満たす時のみ。
   let nextItem = null;
   let restFuture = futureItems;
 
@@ -61,15 +57,22 @@ function classifySessions(sessions, globalTodayExists, globalNextItemId) {
 
 // ── Section component ─────────────────────────────────────────────────────────
 
-function Section({ icon: Icon, title, content, bgColor, textColor }) {
+function Section({ icon, title, content, bgColor, textColor, borderNeon }) {
   if (!content?.trim()) return null;
+  const Icon = icon;
   return (
-    <div className="rounded-xl p-3 mb-2" style={{ backgroundColor: bgColor }}>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <Icon size={14} className="shrink-0 opacity-60" style={{ color: textColor }} />
-        <span className="text-xs font-bold tracking-wider uppercase opacity-60" style={{ color: textColor }}>{title}</span>
+    <div 
+      className="rounded-2xl p-3.5 mb-2.5 relative overflow-hidden" 
+      style={{ 
+        backgroundColor: bgColor, 
+        border: `1px solid ${borderNeon}15`,
+      }}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        <Icon size={12} className="shrink-0" style={{ color: textColor }} />
+        <span className="text-[10px] font-black tracking-wider uppercase opacity-70" style={{ color: textColor }}>{title}</span>
       </div>
-      <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: textColor, overflowWrap: 'break-word' }}>
+      <p className="text-sm leading-relaxed whitespace-pre-wrap font-bold text-slate-800" style={{ overflowWrap: 'break-word' }}>
         {content}
       </p>
     </div>
@@ -82,19 +85,28 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
   const [expanded, setExpanded] = useState(defaultOpen);
   const cardRef = useRef(null);
 
-  // カレンダーからのスクロール対応
   useEffect(() => {
     if (scrollRef?.current === item.id && cardRef.current) {
       cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       scrollRef.current = null;
-      setExpanded(true);
+      setTimeout(() => {
+        setExpanded(true);
+      }, 0);
     }
   }, [scrollRef, item.id]);
 
   const actualLocation = item.location ? (item.location.includes('→') ? item.location.split('→').pop().trim() : item.location) : '';
   const loc = locationStyles[actualLocation] ?? defaultLocationStyle;
   const isChangedLocation = item.location?.includes('変更') || item.location?.includes('→');
-  const badgeStyle = isChangedLocation ? { bg: '#FEF2F2', border: '#EF4444', text: '#B91C1C' } : loc;
+  
+  // ライトモード用にバッジカラーを上品に調整
+  const badgeStyle = isChangedLocation 
+    ? { bg: 'rgba(239, 68, 68, 0.08)', border: '#FCA5A5', text: '#DC2626' } 
+    : {
+        bg: 'rgba(241, 245, 249, 0.7)',
+        border: '#E2E8F0',
+        text: '#475569'
+      };
   
   const matchName = getMatchName(item.time);
   const displayTime = matchName ? null : item.time;
@@ -102,87 +114,86 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
   return (
     <div
       ref={cardRef}
-      className={`bg-white rounded-2xl shadow-sm overflow-hidden mb-3 transition-all border ${isPast ? 'opacity-55' : ''}`}
-      style={{ borderColor: expanded ? loc.border : '#e2e8f0', boxShadow: expanded ? `0 2px 12px 0 ${loc.border}33` : undefined }}
+      className={`bg-white border border-slate-100 rounded-3xl overflow-hidden mb-3.5 transition-all duration-300 relative ${isPast ? 'opacity-50' : ''} ${
+        expanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.03)] border-slate-200/80' : 'shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-slate-200/40'
+      }`}
     >
-      {/* 今日の場合は場所の色でトップストライプ */}
+      {/* 今日の場合は上端に美しいアクティビティカラーのグラデーションバー */}
       {isToday && (
-        <div className="h-1" style={{ background: `linear-gradient(90deg, ${loc.border}, #6366f1)` }} />
+        <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
       )}
 
-      {/* Card header — クリックで展開 */}
-      <button className="w-full text-left px-4 py-3.5 focus:outline-none" onClick={() => setExpanded(v => !v)}>
+      {/* Card Header — クリックで展開 */}
+      <button className="w-full text-left px-4.5 py-4 focus:outline-none" onClick={() => setExpanded(v => !v)}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
 
             {/* Date + status badges */}
-            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
-              {/* 日程一覧以外、または通常の練習の場合は日付をメインに */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {(!isScheduleView || (!(item.type === 'event' || item.type === 'record' || matchName))) && (
-                <p className={`text-base font-bold leading-tight ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>
+                <p className={`text-[15px] font-black leading-tight ${isPast ? 'text-slate-400' : 'text-slate-800'}`}>
                   {formatDate(item.date, item.dayOfWeek, item.displayDate)}
                 </p>
               )}
               {isToday && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-blue-600 text-white rounded-full">今日</span>
+                <span className="text-[9px] font-black px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 uppercase tracking-wider">今日</span>
               )}
               {isNext && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-indigo-100 text-indigo-600 rounded-full">次の予定</span>
+                <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 uppercase tracking-wider">次の予定</span>
               )}
               {item.type === 'event' && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-fuchsia-100 text-fuchsia-700 rounded-full border border-fuchsia-200">大会・行事</span>
-              )}
-              {item.type === 'record' && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full border border-teal-200">記録会</span>
-              )}
+                 <span className="text-[9px] font-black px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full border border-orange-100 uppercase tracking-wider">大会・行事</span>
+               )}
+               {item.type === 'record' && (
+                 <span className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">記録会</span>
+               )}
               {matchName && !item.type && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-red-100 text-red-700 rounded-full border border-red-200">試合</span>
+                <span className="text-[9px] font-black px-2 py-0.5 bg-red-50 text-red-600 rounded-full border border-red-100 uppercase tracking-wider">試合</span>
               )}
               {isPast && (
-                <span className="text-xs font-semibold px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full">終了</span>
+                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full border border-slate-200/50 uppercase tracking-wider">終了</span>
               )}
-              {/* 日程一覧かつ大会・記録会の場合は日付をサブに */}
               {isScheduleView && (item.type === 'event' || item.type === 'record' || matchName) && (
-                <span className="text-xs font-bold px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full border border-slate-200">
+                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-50 border border-slate-100 text-slate-500 rounded-full">
                   {formatDate(item.date, item.dayOfWeek, item.displayDate)}
                 </span>
               )}
             </div>
 
             {/* Title / Name (条件出し分け) */}
-            {(item.type === 'event' || item.type === 'record' || matchName) && (
-              <h3 className={`${isScheduleView ? 'text-lg' : 'text-base'} font-black leading-tight mb-1 ${
-                item.type === 'event' ? 'text-fuchsia-800' : 
-                item.type === 'record' ? 'text-teal-800' : 
-                'text-red-800'
-              }`}>
+             {(item.type === 'event' || item.type === 'record' || matchName) && (
+               <h3 className={`${isScheduleView ? 'text-[17px]' : 'text-[15px]'} font-black leading-tight mb-2.5 ${
+                 item.type === 'event' ? 'text-orange-600' : 
+                 item.type === 'record' ? 'text-emerald-600' : 
+                 'text-orange-600'
+               }`}>
                 {item.name || matchName}
               </h3>
             )}
 
-            {/* Location + time / match name */}
-            <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1">
+            {/* Location + time */}
+            <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1.5">
               {item.location && (
                 <span
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border"
+                  className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border"
                   style={{ backgroundColor: badgeStyle.bg, borderColor: badgeStyle.border, color: badgeStyle.text }}
                 >
-                  <MapPin size={10} />
+                  <MapPin size={9} />
                   {item.location}
                 </span>
               )}
               {displayTime && !item.type && (
-                <span className="inline-flex items-center gap-1 text-xs text-slate-500 font-medium">
-                  <Clock size={11} className="text-slate-400" />
+                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-bold">
+                  <Clock size={10} className="text-slate-400" />
                   {displayTime}
                 </span>
               )}
 
               {item.type === 'record' && item.entryPeriod && (
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded border ${
                     item.entryStatus === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
                     item.entryStatus === 'upcoming' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                    'bg-white text-slate-400 border-slate-100'
+                    'bg-slate-50 text-slate-400 border-slate-100'
                 }`}>
                   {item.entryStatus === 'active' ? '募集中: ' : item.entryStatus === 'upcoming' ? '予告: ' : '受付終了: '}
                   {item.entryPeriod}
@@ -192,76 +203,75 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
           </div>
 
           {/* Chevron */}
-          <div className={`shrink-0 mt-0.5 p-1 rounded-full ${isPast ? 'text-slate-300' : 'text-slate-300'}`}>
-            {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          <div className="shrink-0 mt-1 p-1 rounded-full text-slate-400 active:text-slate-600">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
         </div>
       </button>
 
-      {/* Expanded content */}
+      {/* Expanded Content */}
       {expanded && (
-        <div className="px-4 pb-4 border-t border-slate-50">
+        <div className="px-4.5 pb-4.5 border-t border-slate-50">
           <div className="pt-3">
             {item.type === 'record' ? (
-              <Section icon={Clock} title="エントリー期間" content={item.entryPeriod} bgColor="#FFFBEB" textColor="#D97706" />
+              <Section icon={Clock} title="エントリー期間" content={item.entryPeriod} bgColor="rgba(245, 158, 11, 0.05)" textColor="#d97706" borderNeon="#f59e0b" />
             ) : matchName ? (
-              // 試合の場合は補足のみ
-              <Section icon={Trophy} title="詳細・メモ" content={item.notes} bgColor="#FEF2F2" textColor="#991B1B" />
+              <Section icon={Trophy} title="詳細・メモ" content={item.notes} bgColor="rgba(239, 68, 68, 0.05)" textColor="#dc2626" borderNeon="#ef4444" />
             ) : (
               (item.type !== 'event') && (
                 <>
-                  <Section icon={ListChecks} title="メニュー" content={item.menu} bgColor="#EFF6FF" textColor="#1E40AF" />
-                  <Section icon={Timer} title="ペース" content={item.pace} bgColor="#F0FDF4" textColor="#166534" />
-                  <Section icon={StickyNote} title="補足" content={item.notes} bgColor="#FFFBEB" textColor="#92400E" />
+                   <Section icon={ListChecks} title="練習メニュー" content={item.menu} bgColor="rgba(59, 130, 246, 0.05)" textColor="#2563eb" borderNeon="#3b82f6" />
+                   <Section icon={Timer} title="ペース目安" content={item.pace} bgColor="rgba(16, 185, 129, 0.05)" textColor="#059669" borderNeon="#10b981" />
+                   <Section icon={StickyNote} title="補足・メモ" content={item.notes} bgColor="rgba(234, 179, 8, 0.05)" textColor="#ca8a04" borderNeon="#eab308" />
                 </>
               )
             )}
 
-            {/* 場所・アクセス */}
+            {/* 場所・アクセス (アコーディオン内のロケーション詳細) */}
             {item.location && locationDetails[actualLocation] && (
-              <div className="mt-3 p-3 rounded-xl border border-slate-100 bg-slate-50">
+              <div className="mt-3.5 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-1.5 mb-2">
-                  <MapPin size={14} className="opacity-60" style={{ color: loc.text }} />
-                  <span className="text-xs font-bold tracking-wider uppercase opacity-60" style={{ color: loc.text }}>アクセス・マップ</span>
+                  <MapPin size={12} className="opacity-70" style={{ color: loc.border }} />
+                  <span className="text-[9px] font-black tracking-wider uppercase opacity-60 text-slate-500">アクセス情報</span>
                 </div>
-                <div className="text-sm text-slate-700 leading-relaxed mb-3">
-                  <p className="font-semibold text-[15px] mb-1">{locationDetails[actualLocation].name}</p>
+                
+                <div className="text-xs text-slate-600 leading-relaxed mb-3">
+                  <p className="font-black text-[13px] text-slate-800 mb-1">{locationDetails[actualLocation].name}</p>
                   {locationDetails[actualLocation].access?.length > 0 && (
-                    <div className="flex flex-col gap-1 mb-1.5">
+                    <div className="flex flex-wrap gap-1 mb-1.5">
                       {locationDetails[actualLocation].access.map((acc, i) => (
-                        <p key={i} className="text-slate-500 text-xs bg-white self-start px-1.5 py-0.5 rounded border border-slate-200">
+                        <p key={i} className="text-slate-500 text-[10px] bg-white px-2 py-0.5 rounded-md border border-slate-100 font-bold">
                           {acc}
                         </p>
                       ))}
                     </div>
                   )}
                   {locationDetails[actualLocation].fee && (
-                    <p className="text-slate-500 text-xs">
+                    <p className="text-slate-400 text-[10px] font-bold">
                       料金: {locationDetails[actualLocation].fee}
                     </p>
                   )}
                 </div>
+                
                 {locationDetails[actualLocation].url && (
                   <div className="flex gap-2">
                     <a
                       href={locationDetails[actualLocation].url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-slate-100 text-slate-700 text-[11px] font-black hover:bg-slate-50 transition-all shadow-sm active:scale-95"
                     >
-                      <Map size={14} />
+                      <Map size={11} className="text-blue-500" />
                       Google Maps
-                      <ExternalLink size={12} className="opacity-40" />
                     </a>
                     <a
                       href={locationDetails[actualLocation].appleUrl || `https://maps.apple.com/?q=${encodeURIComponent(locationDetails[actualLocation].appleQuery || locationDetails[actualLocation].name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs sm:text-sm font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-slate-100 text-slate-700 text-[11px] font-black hover:bg-slate-50 transition-all shadow-sm active:scale-95"
                     >
-                      <MapPin size={14} />
+                      <MapPin size={11} className="text-emerald-500" />
                       Apple Maps
-                      <ExternalLink size={12} className="opacity-40" />
                     </a>
                   </div>
                 )}
@@ -278,30 +288,48 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
 
 function SectionDivider({ label }) {
   return (
-    <div className="flex items-center gap-3 my-5">
-      <div className="flex-1 h-px bg-slate-200" />
-      <span className="text-xs text-slate-400 font-semibold tracking-wide uppercase">{label}</span>
-      <div className="flex-1 h-px bg-slate-200" />
+    <div className="flex items-center gap-3 my-4 px-1 animate-fade-in">
+      <div className="flex-1 h-px bg-slate-100" />
+      <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase">{label}</span>
+      <div className="flex-1 h-px bg-slate-100" />
     </div>
   );
 }
 
-// ── App ───────────────────────────────────────────────────────────────────────
+// ── Main App Component ────────────────────────────────────────────────────────
 
 export default function App() {
-  const currentMonthStr = `${new Date().getMonth() + 1}月`;
-  const [activeMonth, setActiveMonth] = useState(() => months.includes(currentMonthStr) ? currentMonthStr : months[months.length - 2] ?? months[0]);
-  const [practiceSessions, setPracticeSessions] = useState([]);
-  const [scheduleSessions, setScheduleSessions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showLocations, setShowLocations] = useState(false);
-  const [showStats, setShowStats] = useState(false);
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+     const currentMonthStr = `${new Date().getMonth() + 1}月`;
+     const [activeMonth, setActiveMonth] = useState(() => months.includes(currentMonthStr) ? currentMonthStr : months[months.length - 2] ?? months[0]);
+     const [practiceSessions, setPracticeSessions] = useState([]);
+     const [scheduleSessions, setScheduleSessions] = useState([]);
+     const [loading, setLoading] = useState(false);
+     const [showCalendar, setShowCalendar] = useState(false);
+     const [showLocations, setShowLocations] = useState(false);
+     const [scheduleCategory, setScheduleCategory] = useState('大会・行事'); // 大会・行事, 記録会
+     
+     // 📱 新マルチタブ用の状態変数
+     const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'ranking' | 'analytics'
+
+     // メンバー状態の永続化
+     const [selectedMember, setSelectedMember] = useState(() => {
+       return localStorage.getItem('tf_selected_member') || '';
+     });
+
+     useEffect(() => {
+       if (selectedMember) {
+         localStorage.setItem('tf_selected_member', selectedMember);
+       }
+     }, [selectedMember]);
+
   const scrollToId = useRef(null);
-  const sessionCache = useRef({}); // 月ごとの練習データをキャッシュ
-  const [scheduleCategory, setScheduleCategory] = useState('大会・行事'); //大会・行事, 記録会
+  const sessionCache = useRef({});
+  const [allPracticeSessions, setAllPracticeSessions] = useState([]);
+
+  const updateAllPracticeSessions = useCallback(() => {
+    const allPractice = Object.values(sessionCache.current).flat();
+    setAllPracticeSessions(allPractice);
+  }, []);
 
   // 全月分のデータをバックグラウンドで読み込む
   useEffect(() => {
@@ -311,7 +339,6 @@ export default function App() {
       const ts = isBeginningOfMonth ? Date.now() : null;
 
       for (const m of targetMonths) {
-        // 月初めかつ初回のみキャッシュを無視して強制リロード
         if (!sessionCache.current[m] || isBeginningOfMonth) {
           try {
             if (hasConfig()) {
@@ -320,93 +347,18 @@ export default function App() {
             } else {
               sessionCache.current[m] = [...(mockData[m] ?? [])];
             }
-          } catch (e) {
+          } catch {
             sessionCache.current[m] = [...(mockData[m] ?? [])];
           }
         }
       }
-      // 再描画を促すために空の更新、または practiceSessions が空なら最新月をロード
       if (practiceSessions.length === 0) {
         setPracticeSessions(sessionCache.current[activeMonth] || []);
       }
+      updateAllPracticeSessions();
     }
     preloadAll();
-  }, [activeMonth, practiceSessions.length]);
-
-  // バックグラウンドで部員の走行距離データをプリロードする
-  useEffect(() => {
-    if (!hasConfig()) return;
-
-    async function preloadMemberStats() {
-      const CACHE_KEY = 'tf_member_stats_cache';
-      const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
-      const cachedData = localStorage.getItem(CACHE_KEY);
-      const cachedTs = localStorage.getItem(CACHE_TS_KEY);
-
-      if (cachedData && cachedTs) {
-        // キャッシュが存在する場合、直近1時間以内であれば自動更新はスキップしてキャッシュをそのまま使う
-        const parseDate = (tsStr) => {
-          const now = new Date();
-          const match = tsStr.match(/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
-          if (!match) return null;
-          return new Date(now.getFullYear(), parseInt(match[1]) - 1, parseInt(match[2]), parseInt(match[3]), parseInt(match[4]));
-        };
-        const tsDate = parseDate(cachedTs);
-        if (tsDate && (new Date() - tsDate) < 60 * 60 * 1000) { // 1時間以内
-          console.log('Stats cache is fresh (less than 1 hour old), skipping preload.');
-          return;
-        }
-      }
-
-      console.log('Starting background preload of member stats...');
-      try {
-        const sheetList = await fetchSheetList();
-        if (sheetList.length === 0) return;
-
-        // Promise.all を使用して並行フェッチに変更（劇的な高速化）
-        const promises = sheetList.map(async (sheet) => {
-          try {
-            const records = await fetchMemberPracticeData(sheet.gid);
-            if (records !== null) {
-              return {
-                name: sheet.name,
-                gid: sheet.gid,
-                records: records
-              };
-            }
-          } catch (err) {
-            console.warn(`[Preload] メンバー「${sheet.name}」のデータ取得に失敗:`, err);
-          }
-          return null;
-        });
-
-        const results = await Promise.all(promises);
-        const parsedMembers = results.filter(m => m !== null);
-
-        const sorted = parsedMembers.sort((a, b) => a.name.localeCompare(b.name));
-        localStorage.setItem(CACHE_KEY, JSON.stringify(sorted));
-        
-        const nowStr = new Date().toLocaleString('ja-JP', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        });
-        localStorage.setItem(CACHE_TS_KEY, nowStr);
-        console.log('Background preload of member stats completed successfully!');
-        
-        // もしすでにStatsModalが開いていたら、データを更新するためにカスタムイベントを発行する
-        window.dispatchEvent(new CustomEvent('tf_stats_cache_updated', { detail: { members: sorted, timestamp: nowStr } }));
-
-      } catch (e) {
-        console.warn('Background stats preload failed:', e);
-      }
-    }
-
-    // アプリ起動3秒後にプリロードを開始（メインの読み込みを邪魔しないため）
-    const timer = setTimeout(preloadMemberStats, 3000);
-    return () => clearTimeout(timer);
-  }, []);
+  }, [activeMonth, practiceSessions.length, updateAllPracticeSessions]);
 
   const loadSchedule = useCallback(async (timestamp) => {
     setLoading(true);
@@ -414,14 +366,13 @@ export default function App() {
     if (hasConfig()) {
       try {
         sched = await fetchScheduleData(timestamp);
-      } catch(e) {
+      } catch {
         sched = mockScheduleData;
       }
     } else {
       sched = mockScheduleData;
     }
     
-    // エントリステータスの付与
     const updated = sched.map(s => {
       const year = s.date?.split('-')[0];
       const status = s.type === 'record' ? getEntryPeriodStatus(s.entryPeriod, year) : null;
@@ -435,16 +386,15 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  // 初回に日程一覧を一括フェッチする
   useEffect(() => {
     const isBeginningOfMonth = new Date().getDate() <= 3;
-    loadSchedule(isBeginningOfMonth ? Date.now() : null);
+    setTimeout(() => {
+      loadSchedule(isBeginningOfMonth ? Date.now() : null);
+    }, 0);
   }, [loadSchedule]);
 
   const loadData = useCallback(async (month) => {
-    if (month === '日程一覧') {
-      return; // 日程一覧の時は練習データをフェッチしない
-    }
+    if (month === '日程一覧') return;
 
     if (sessionCache.current[month]) {
       setPracticeSessions(sessionCache.current[month]);
@@ -452,7 +402,6 @@ export default function App() {
     }
 
     setLoading(true);
-    setError(null);
     try {
       if (hasConfig()) {
         const data = await fetchPracticeData(month);
@@ -464,36 +413,39 @@ export default function App() {
         sessionCache.current[month] = mock;
       }
     } catch (e) {
-      setError(e.message);
+      console.error(e);
       const mockFallback = [...(mockData[month] ?? [])];
       setPracticeSessions(mockFallback);
       sessionCache.current[month] = mockFallback;
     }
+    updateAllPracticeSessions();
     setLoading(false);
-  }, []);
+  }, [updateAllPracticeSessions]);
 
   async function handleManualRefresh() {
     if (activeMonth === '日程一覧') {
       await loadSchedule(Date.now());
     } else {
-      delete sessionCache.current[activeMonth]; // 現在の月のキャッシュを破棄
-      await loadData(activeMonth); // 再読み込み
+      delete sessionCache.current[activeMonth];
+      await loadData(activeMonth);
     }
   }
 
-  // タブ切替時に先頭にスクロール
   function handleMonthChange(month) {
     setActiveMonth(month);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  useEffect(() => { loadData(activeMonth); }, [activeMonth, loadData]);
+  useEffect(() => {
+    setTimeout(() => {
+      loadData(activeMonth);
+    }, 0);
+  }, [activeMonth, loadData]);
 
-  // 同一日の優先順位: 1. 大会 2. 記録会 3. 練習
   const getPriority = (item) => {
     if (item.type === 'event') return 1;
     if (item.type === 'record') return 2;
-    if (getMatchName(item.time)) return 1.5; // 練習枠の試合は大体大会と同じ扱い
+    if (getMatchName(item.time)) return 1.5;
     return 3;
   };
 
@@ -504,10 +456,9 @@ export default function App() {
     });
   };
 
-  // 表示用のセッションを計算（練習メニュー＋その月の予定）
+  // 表示用セッションの算出
   let displaySessions = [];
   if (activeMonth === '日程一覧') {
-    // フィルタリング
     let filtered = [...scheduleSessions];
     if (scheduleCategory === '大会・行事') {
       filtered = filtered.filter(s => s.type === 'event');
@@ -515,7 +466,6 @@ export default function App() {
       filtered = filtered.filter(s => s.type === 'record');
     }
 
-    // ソート（未来・今日を上に、過去を下に）
     const upcoming = filtered.filter(s => s.date >= TODAY_ISO);
     const past = filtered.filter(s => s.date < TODAY_ISO);
     displaySessions = [...sortSessions(upcoming), ...sortSessions(past)];
@@ -528,7 +478,6 @@ export default function App() {
       const filteredSchedule = scheduleSessions.filter(s => {
         if (!s.date) return false;
         const [sYear, sMonth] = s.date.split('-').map(v => parseInt(v, 10));
-        // 年度を考慮: 現在の年の該当月のみ表示（来年の3月などは除外）
         return sMonth === monthNum && sYear === currentYear;
       });
       displaySessions = sortSessions([...practiceSessions, ...filteredSchedule]);
@@ -537,11 +486,9 @@ export default function App() {
     }
   }
 
-  // カレンダー用の全セッション (全月の練習 + 全日程)
-  const allSessionsForCalendar = (() => {
-    const allPractice = Object.values(sessionCache.current).flat();
-    return [...allPractice, ...scheduleSessions];
-  })();
+  const allSessionsForCalendar = useMemo(() => {
+    return [...allPracticeSessions, ...scheduleSessions];
+  }, [allPracticeSessions, scheduleSessions]);
 
   const isScheduleView = activeMonth === '日程一覧';
 
@@ -568,215 +515,315 @@ export default function App() {
   const hasContent = displaySessions.length > 0;
 
   function handleSelectDate(dateStr) {
-    setShowCalendar(false);
-    const target = displaySessions.find(s => s.date === dateStr);
-    if (target) {
-      setTimeout(() => { scrollToId.current = target.id; }, 100);
+    // 選択された月へ自動的に切り替え
+    const selectedDateObj = new Date(dateStr);
+    const mStr = `${selectedDateObj.getMonth() + 1}月`;
+    if (months.includes(mStr) && activeMonth !== mStr) {
+      setActiveMonth(mStr);
     }
+    
+    // カレンダーを非表示に
+    setShowCalendar(false);
+    
+    // スクロール先の特定
+    setTimeout(() => {
+      const target = displaySessions.find(s => s.date === dateStr);
+      if (target) {
+        scrollToId.current = target.id;
+        const cardElem = document.getElementById(`card-${target.id}`);
+        if (cardElem) {
+          cardElem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+    }, 200);
   }
 
-  // 表示する月のリストを制限 (日程一覧を先頭に、あとは今月と来月のみ)
-  const visibleMonths = (() => {
+  // スマホ上部に並ぶ月選択チップスのリスト (日程一覧＋練習メニュー対象月)
+  const visibleMonthChips = (() => {
     const todayMonth = new Date().getMonth() + 1;
     const nextMonth = todayMonth === 12 ? 1 : todayMonth + 1;
     
-    // 日程一覧を先頭に
     const result = ['日程一覧'];
-    
-    // 今月と来月を追加
     months.forEach(m => {
       const match = m.match(/^(\d+)月/);
       if (match) {
-        const mNum = parseInt(match[1], 10);
+        const mNum = parseInt(match[0], 10);
         if (mNum === todayMonth || mNum === nextMonth) {
           result.push(m);
         }
       }
     });
-    
     return result;
   })();
-
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col pb-24">
 
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-20">
-        <div 
-          className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 shadow-lg pb-3"
-          style={{ paddingTop: 'calc(env(safe-area-inset-top) + 0.875rem)' }}
-        >
-          <div className="max-w-lg mx-auto px-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5 relative">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm shrink-0">
-                  <Zap size={20} className="text-white" />
-                </div>
-                <div className="relative">
-                  <button 
-                    onClick={() => setShowMonthDropdown(!showMonthDropdown)}
-                    className="flex items-center gap-1 text-white font-black text-xl leading-none tracking-tight focus:outline-none"
-                  >
-                    {activeMonth} <ChevronDown size={18} className={`transition-transform duration-200 opacity-90 ${showMonthDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-                  <p className="text-blue-200 text-xs font-semibold leading-none mt-1 tracking-wide">
-                    {activeMonth === '日程一覧' ? '大会・行事・記録会' : '練習メニュー'}
-                  </p>
-                  
-                  {/* Dropdown Menu */}
-                  {showMonthDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setShowMonthDropdown(false)} />
-                      <div className="absolute top-full left-0 mt-3 w-44 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden z-40 transform origin-top-left transition-all">
-                        <div className="py-1">
-                          {visibleMonths.map(month => (
-                            <button 
-                              key={month} 
-                              onClick={() => { handleMonthChange(month); setShowMonthDropdown(false); }}
-                              className={`w-full text-left px-5 py-3.5 text-[15px] font-bold transition-colors border-b border-slate-50 last:border-none ${
-                                activeMonth === month ? 'bg-blue-50 text-blue-700' : 'text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              {month === '日程一覧' ? (
-                                <span className="flex items-center gap-2">
-                                  <Trophy size={16} className="text-amber-500" />
-                                  日程一覧
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-2">
-                                  <CalendarDays size={16} className="text-blue-500 opacity-60" />
-                                  {month}
-                                </span>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-0.5">
-                <button onClick={handleManualRefresh}
-                  disabled={loading}
-                  className={`p-2.5 rounded-full hover:bg-white/20 transition-all text-white/80 hover:text-white ${loading ? 'animate-spin opacity-50' : ''}`} title="最新データを取得">
-                  <RefreshCcw size={20} />
-                </button>
-                <button onClick={() => setShowStats(true)}
-                  className="p-2.5 rounded-full hover:bg-white/20 transition-colors text-white/80 hover:text-white" title="走行距離ランキング">
-                  <Footprints size={22} />
-                </button>
-                <button onClick={() => setShowLocations(true)}
-                  className="p-2.5 rounded-full hover:bg-white/20 transition-colors text-white/80 hover:text-white" title="場所・アクセス一覧">
-                  <Map size={22} />
-                </button>
-                <button id="btn-calendar" onClick={() => setShowCalendar(true)}
-                  className="p-2.5 rounded-full hover:bg-white/20 transition-colors text-white/80 hover:text-white" title="カレンダー">
-                  <CalendarDays size={22} />
-                </button>
-              </div>
+      {/* ── 📱 Header ── (一切の帯を省いたスマートヘッダー) */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+        <div className="max-w-md mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div>
+              <h1 className="text-sm font-black text-slate-800 tracking-tight leading-none">TUAT RUNNING STATS</h1>
+              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider leading-none mt-1.5 block">TRACK & FIELD</span>
             </div>
           </div>
+          
+          {/* 手動同期ボタン */}
+          <button 
+            onClick={handleManualRefresh}
+            disabled={loading}
+            className={`p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-800 transition-colors shadow-sm ${loading ? 'animate-spin opacity-50' : ''}`}
+            title="データを同期"
+          >
+            <RefreshCcw size={15} />
+          </button>
         </div>
       </header>
 
-      {/* ── Main ── */}
-      <main className="max-w-lg mx-auto px-3 sm:px-4 py-4">
-        {isScheduleView && (
-          <div className="flex bg-slate-200 p-1 rounded-xl mb-4 gap-1">
-            {['大会・行事', '記録会'].map(cat => (
+      {/* ── 📱 Main Content Area ── */}
+      <main className="flex-1 max-w-md mx-auto w-full px-3 pt-3">
+        
+        {/* 📅 Tab 1: スケジュール */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-4">
+            
+            {/* 月選択 セグメンテッドコントロール (iOS仕様) */}
+            <div className="bg-slate-100/70 p-0.5 rounded-2xl flex w-full relative">
+              {visibleMonthChips.map(m => {
+                const isActive = activeMonth === m;
+                return (
+                  <button
+                    key={m}
+                    onClick={() => handleMonthChange(m)}
+                    className={`flex-1 py-2 text-center rounded-xl text-[11px] font-black transition-all relative z-10 duration-200 select-none ${
+                      isActive 
+                        ? 'bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)]' 
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    {m === '日程一覧' ? '🏆 日程一覧' : `📅 ${m}`}
+                  </button>
+                );
+              })}
+            </div>
+ 
+            {/* ミニカレンダー表示トグル & 練習場所一覧トグル */}
+            <div className="flex gap-2">
               <button
-                key={cat}
-                onClick={() => setScheduleCategory(cat)}
-                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                  scheduleCategory === cat ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+                onClick={() => {
+                  setShowCalendar(!showCalendar);
+                  setShowLocations(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-black transition-all border ${
+                  showCalendar 
+                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-inner' 
+                    : 'bg-white border-slate-100 text-slate-600'
                 }`}
               >
-                {cat}
+                <CalendarIcon size={13} />
+                {showCalendar ? 'カレンダー閉じる' : 'カレンダーで探す'}
               </button>
-            ))}
-          </div>
-        )}
-        {error && (
-          <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-xs text-red-700 leading-relaxed">
-            <strong>取得エラー:</strong> {error}（モックデータを表示中）
-          </div>
-        )}
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-            <div className="w-6 h-6 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin" />
-            <p className="text-sm font-medium">読み込み中...</p>
-          </div>
-        ) : !hasContent ? (
-          <div className="text-center py-16 text-slate-400">
-            <CalendarDays size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="text-base font-medium">データがありません</p>
-          </div>
-        ) : isScheduleView ? (
-          // 日程一覧の表示 (年ごとにグループ化)
-          Object.keys(groupedSchedules).sort().map(year => {
-            const sessions = groupedSchedules[year];
-            const upcoming = sessions.filter(s => s.date >= TODAY_ISO);
-            const past = sessions.filter(s => s.date < TODAY_ISO);
+              <button
+                onClick={() => {
+                  setShowLocations(!showLocations);
+                  setShowCalendar(false);
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-black transition-all border ${
+                  showLocations 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600 shadow-inner' 
+                    : 'bg-white border-slate-100 text-slate-600'
+                }`}
+              >
+                <MapPin size={13} />
+                {showLocations ? '場所一覧を閉じる' : '練習場所一覧'}
+              </button>
+            </div>
+ 
+            {/* インライン・マンスリーカレンダー (トグル式アコーディオン) */}
+            {showCalendar && (
+              <div className="animate-fade-in">
+                <CalendarModal 
+                  sessions={allSessionsForCalendar} 
+                  onSelectDate={handleSelectDate} 
+                  activeMonthStr={activeMonth}
+                  availableMonthsList={months.filter(m => m !== '日程一覧')}
+                />
+              </div>
+            )}
 
-            return (
-              <div key={year}>
-                <SectionDivider label={`${year}年`} />
-                {upcoming.map(item => (
-                  <PracticeCard key={item.id} item={item} defaultOpen={false} scrollRef={scrollToId} isScheduleView={true} />
+            {/* インライン・練習場所アクセス (トグル式アコーディオン) */}
+            {showLocations && (
+              <div className="animate-fade-in">
+                <LocationsModal />
+              </div>
+            )}
+
+            {/* 日程一覧用のカテゴリースイッチ */}
+            {isScheduleView && (
+              <div className="flex bg-slate-100 p-0.5 rounded-2xl border border-slate-200 shadow-inner">
+                {['大会・行事', '記録会'].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setScheduleCategory(cat)}
+                    className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${
+                      scheduleCategory === cat 
+                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' 
+                        : 'text-slate-400 active:text-slate-600'
+                    }`}
+                  >
+                    {cat}
+                  </button>
                 ))}
-                {past.length > 0 && (
-                  <>
-                    <SectionDivider label="終了した予定" />
-                    {past.map(item => (
-                      <PracticeCard key={item.id} item={item} defaultOpen={false} isPast={true} scrollRef={scrollToId} isScheduleView={true} />
+              </div>
+            )}
+
+            {/* 練習メニューリスト */}
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                <p className="text-xs font-bold">練習メニュー取得中...</p>
+              </div>
+            ) : !hasContent ? (
+              <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-3xl bg-white">
+                <CalendarDays size={32} className="mx-auto mb-2 opacity-25 text-slate-300" />
+                <p className="text-sm font-bold">この月の予定はありません</p>
+              </div>
+            ) : isScheduleView ? (
+              // 日程一覧
+              Object.keys(groupedSchedules).sort().map(year => {
+                const sessions = groupedSchedules[year];
+                const upcoming = sessions.filter(s => s.date >= TODAY_ISO);
+                const past = sessions.filter(s => s.date < TODAY_ISO);
+
+                return (
+                  <div key={year} className="space-y-1">
+                    <SectionDivider label={`${year}年`} />
+                    {upcoming.map(item => (
+                      <div key={item.id} id={`card-${item.id}`}>
+                        <PracticeCard item={item} defaultOpen={false} scrollRef={scrollToId} isScheduleView={true} />
+                      </div>
                     ))}
-                  </>
+                    {past.length > 0 && (
+                      <>
+                        <SectionDivider label="終了した予定" />
+                        {past.map(item => (
+                          <div key={item.id} id={`card-${item.id}`}>
+                            <PracticeCard item={item} defaultOpen={false} isPast={true} scrollRef={scrollToId} isScheduleView={true} />
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              // 月別メニュー
+              <div className="space-y-3.5 pb-8">
+                {/* ① 今日の練習 */}
+                {todayItems.map(item => (
+                  <div key={item.id} id={`card-${item.id}`}>
+                    <PracticeCard item={item} defaultOpen={true} isToday={true} scrollRef={scrollToId} />
+                  </div>
+                ))}
+
+                {/* ② 次の練習 */}
+                {nextItem && (
+                  <div key={nextItem.id} id={`card-${nextItem.id}`}>
+                    <PracticeCard item={nextItem} defaultOpen={todayItems.length === 0} isNext={true} scrollRef={scrollToId} />
+                  </div>
+                )}
+
+                {/* ③ それ以降の予定 */}
+                {restFuture.map(item => (
+                  <div key={item.id} id={`card-${item.id}`}>
+                    <PracticeCard item={item} defaultOpen={false} scrollRef={scrollToId} />
+                  </div>
+                ))}
+
+                {/* ④ 過去の練習 */}
+                {pastItems.length > 0 && (
+                  <div className="space-y-3">
+                    <SectionDivider label="終了した予定" />
+                    {pastItems.map(item => (
+                      <div key={item.id} id={`card-${item.id}`}>
+                        <PracticeCard item={item} defaultOpen={false} isPast={true} scrollRef={scrollToId} />
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            );
-          })
-        ) : (
-          <>
-            {/* ① 今日の練習 */}
-            {todayItems.map(item => (
-              <PracticeCard key={item.id} item={item} defaultOpen={true} isToday={true} scrollRef={scrollToId} />
-            ))}
-
-            {/* ② 次の練習（今日の練習がない場合のみ展開） */}
-            {nextItem && (
-              <PracticeCard item={nextItem} defaultOpen={todayItems.length === 0} isNext={true} scrollRef={scrollToId} />
             )}
 
-            {/* ③ それ以降の予定（昇順・折りたたみ） */}
-            {restFuture.map(item => (
-              <PracticeCard key={item.id} item={item} defaultOpen={false} scrollRef={scrollToId} />
-            ))}
-
-            {/* ④ 過去の練習（仕切り + 昇順 + 薄く） */}
-            {pastItems.length > 0 && (
-              <>
-                <SectionDivider label="終了した予定" />
-                {pastItems.map(item => (
-                  <PracticeCard key={item.id} item={item} defaultOpen={false} isPast={true} scrollRef={scrollToId} />
-                ))}
-              </>
-            )}
-          </>
+          </div>
         )}
+
+        {/* 🏆 Tab 2: ランキング */}
+        {activeTab === 'ranking' && (
+          <StatsDashboard 
+            showSection="ranking" 
+            selectedMember={selectedMember}
+            setSelectedMember={setSelectedMember}
+            setActiveTab={setActiveTab}
+          />
+        )}
+
+        {/* 📊 Tab 3: 個人分析 */}
+        {activeTab === 'analytics' && (
+          <StatsDashboard 
+            showSection="analytics" 
+            selectedMember={selectedMember}
+            setSelectedMember={setSelectedMember}
+            setActiveTab={setActiveTab}
+          />
+        )}
+
       </main>
 
-      {/* ── Modals ── */}
-      {showCalendar && (
-        <CalendarModal sessions={allSessionsForCalendar} onClose={() => setShowCalendar(false)} onSelectDate={handleSelectDate} activeMonthStr={activeMonth} />
-      )}
-      {showLocations && (
-        <LocationsModal onClose={() => setShowLocations(false)} />
-      )}
-      {showStats && (
-        <StatsModal onClose={() => setShowStats(false)} />
-      )}
+      {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}
+      <nav className="fixed bottom-4 inset-x-4 z-40 rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] flex justify-around items-center max-w-md mx-auto">
+        
+        {/* ボタン: 予定 */}
+        <button
+          onClick={() => setActiveTab('schedule')}
+          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
+            activeTab === 'schedule' 
+              ? 'text-blue-600 font-extrabold scale-105' 
+              : 'text-slate-400 active:text-slate-600'
+          }`}
+        >
+          <CalendarDays size={18} className={activeTab === 'schedule' ? 'text-blue-600' : ''} />
+          <span className="text-[9px] tracking-wide font-black">予定</span>
+        </button>
+
+        {/* ボタン: ランキング */}
+        <button
+          onClick={() => setActiveTab('ranking')}
+          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
+            activeTab === 'ranking' 
+              ? 'text-amber-600 font-extrabold scale-105' 
+              : 'text-slate-400 active:text-slate-600'
+          }`}
+        >
+          <Trophy size={18} className={activeTab === 'ranking' ? 'text-amber-600' : ''} />
+          <span className="text-[9px] tracking-wide font-black">ランキング</span>
+        </button>
+
+        {/* ボタン: 個人分析 */}
+        <button
+          onClick={() => setActiveTab('analytics')}
+          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
+            activeTab === 'analytics' 
+              ? 'text-emerald-600 font-extrabold scale-105' 
+              : 'text-slate-400 active:text-slate-600'
+          }`}
+        >
+          <User size={18} className={activeTab === 'analytics' ? 'text-emerald-600' : ''} />
+          <span className="text-[9px] tracking-wide font-black">分析</span>
+        </button>
+
+      </nav>
+
     </div>
   );
 }

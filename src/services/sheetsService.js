@@ -221,7 +221,6 @@ export async function fetchPracticeData(month, timestamp) {
       const dateVal = row[0]?.trim();
       if (!dateVal) return false;
 
-      const cVal     = (row[2] ?? '').trim();   // C: 時間 or 試合名
       const location = (row[3] ?? '').trim();   // D: 場所
       const menu     = (row[4] ?? '').trim();   // E: メニュー
 
@@ -368,8 +367,8 @@ export async function fetchSheetList() {
       if (nameMatch && gidMatch) {
         const name = nameMatch[1];
         const gid = gidMatch[1];
-        // 試験的運用のために B2 で始まるシート名（部員名）のみを抽出
-        if (/^B2/.test(name)) {
+        // 各学年（B1〜B4, M1, M2等）で始まるシート名（部員名）を抽出
+        if (/^[BM]\d/.test(name)) {
           sheets.push({ name, gid });
         }
       }
@@ -410,7 +409,11 @@ export async function fetchMemberPracticeData(gid, timestamp) {
   const mltCol   = header.findIndex(cell => cell.includes('中強度'));
   const cvCol    = header.findIndex(cell => cell.includes('高強度'));
   const speedCol = header.findIndex(cell => cell.includes('解糖系'));
-  const totalCol = header.findIndex(cell => cell.includes('実際の距離'));
+  // まず「実際の距離」を最優先で検索し、なければ完全一致で「距離」を検索（「目標距離」等への誤マッチを防止）
+  let totalCol = header.findIndex(cell => cell.includes('実際の距離'));
+  if (totalCol === -1) {
+    totalCol = header.findIndex(cell => cell.trim() === '距離');
+  }
 
   const dataRows = rows.slice(headerIdx + 1);
   const records = [];
@@ -423,16 +426,71 @@ export async function fetchMemberPracticeData(gid, timestamp) {
 
     const parseVal = (val) => {
       if (!val) return 0;
-      const cleanVal = val.trim().replace(/[^\d.]/g, '');
-      const num = parseFloat(cleanVal);
-      return isNaN(num) ? 0 : num;
+      
+      // 1. 全角英数字、全角記号を半角に標準化
+      let cleanVal = val.trim().replace(/[０-９．＋，、（）]/g, (s) => {
+        if (s === '．') return '.';
+        if (s === '＋') return '+';
+        if (s === '，' || s === '、') return ',';
+        if (s === '（') return '(';
+        if (s === '）') return ')';
+        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+      });
+
+      // 2. 括弧とその中身を完全に除去（例: "12 (1000m x 5)" -> "12 ", "5+5(jog)" -> "5+5"）
+      while (cleanVal.includes('(')) {
+        const start = cleanVal.indexOf('(');
+        const end = cleanVal.indexOf(')', start);
+        if (end !== -1) {
+          cleanVal = cleanVal.substring(0, start) + cleanVal.substring(end + 1);
+        } else {
+          // 閉じ括弧がない場合は、開き括弧以降をすべて切り落とす
+          cleanVal = cleanVal.substring(0, start);
+          break;
+        }
+      }
+
+      // 3. + や , で分割してそれぞれをパースし、合計する
+      const parts = cleanVal.split(/[+,]/);
+      let sum = 0;
+      for (const part of parts) {
+        let p = part.trim();
+        // 数字とピリオド以外を完全に除去
+        p = p.replace(/[^\d.]/g, '');
+        if (!p) continue;
+        const num = parseFloat(p);
+        if (!isNaN(num)) {
+          sum += num;
+        }
+      }
+      return sum;
     };
 
-    const jog   = jogCol !== -1 ? parseVal(row[jogCol]) : 0;
-    const mlt   = mltCol !== -1 ? parseVal(row[mltCol]) : 0;
-    const cv    = cvCol !== -1 ? parseVal(row[cvCol]) : 0;
-    const speed = speedCol !== -1 ? parseVal(row[speedCol]) : 0;
-    const total = totalCol !== -1 ? parseVal(row[totalCol]) : (jog + mlt + cv + speed);
+
+    const jogRaw = jogCol !== -1 ? parseVal(row[jogCol]) : 0;
+    const mlt    = mltCol !== -1 ? parseVal(row[mltCol]) : 0;
+    const cv     = cvCol !== -1 ? parseVal(row[cvCol]) : 0;
+    const speed  = speedCol !== -1 ? parseVal(row[speedCol]) : 0;
+    const actual = (totalCol !== -1 && row[totalCol]) ? parseVal(row[totalCol]) : 0;
+
+    const sumIntensities = jogRaw + mlt + cv + speed;
+    let jog = jogRaw;
+    let total = 0;
+
+    if (sumIntensities > 0) {
+      if (actual > sumIntensities) {
+        // 実際の距離が強度の合計より大きい場合（内訳不足）
+        // 総走行距離は「実際の距離」を採用し、差分はダッシュボード側で自動的に「その他」として色付けされる
+        total = actual;
+      } else {
+        // 強度別の合計を優先（二重カウントや余計な「その他」を排除）
+        total = sumIntensities;
+      }
+    } else if (actual > 0) {
+      // 実際の距離のみ記入されている場合（救済措置）
+      // 走行距離の漏れを防ぐため採用。内訳は 0 のままとし、自動的に「その他」としてカウントさせる
+      total = actual;
+    }
 
     // 感想など (いただいたスプレッドシートの18列目 = index 17)
     const comment = row.length > 17 ? (row[17]?.trim() ?? '') : '';
@@ -440,11 +498,11 @@ export async function fetchMemberPracticeData(gid, timestamp) {
     if (total > 0 || jog > 0 || mlt > 0 || cv > 0 || speed > 0) {
       records.push({
         date: dateStr,
-        total,
-        jog,
-        mlt,
-        cv,
-        speed,
+        total: Math.round(total * 100) / 100,
+        jog: Math.round(jog * 100) / 100,
+        mlt: Math.round(mlt * 100) / 100,
+        cv: Math.round(cv * 100) / 100,
+        speed: Math.round(speed * 100) / 100,
         comment
       });
     }
