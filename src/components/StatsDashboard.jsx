@@ -138,16 +138,35 @@ export default function StatsDashboard({
       setActiveMonthIdx(null);
     }, 0);
   }, [rankingDetailMember]);
-  
-  const [members, setMembers] = useState([]); // { name, gid, records }
-  const [loading, setLoading] = useState(true);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const CACHE_KEY = 'tf_member_stats_cache';
+  const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
+
+  const [members, setMembers] = useState(() => {
+    try {
+      const cached = localStorage.getItem('tf_member_stats_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn('キャッシュデータの初期パース失敗:', e);
+    }
+    return [];
+  });
+
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cachedData = localStorage.getItem('tf_member_stats_cache');
+      const cachedTs = localStorage.getItem('tf_member_stats_cache_ts');
+      return !(cachedData && cachedTs);
+    } catch {
+      return true;
+    }
+  });
+
   const [error, setError] = useState(null);
 
   const todayIso = useMemo(() => getTodayIso(), []);
-
-  const CACHE_KEY = 'tf_member_stats_cache';
-  const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
 
   // アウトサイドクリックでドロップダウンを閉じる
   useEffect(() => {
@@ -198,9 +217,7 @@ export default function StatsDashboard({
     }
 
     try {
-      if (isBackground) {
-        setIsSyncing(true);
-      } else {
+      if (!isBackground) {
         setLoading(true);
       }
       setError(null);
@@ -227,7 +244,6 @@ export default function StatsDashboard({
       if (sheetList.length === 0) {
         setMembers([]);
         setLoading(false);
-        setIsSyncing(false);
         return;
       }
 
@@ -301,7 +317,6 @@ export default function StatsDashboard({
       });
       localStorage.setItem(CACHE_TS_KEY, nowStr);
       setLoading(false);
-      setIsSyncing(false);
 
       if (onDataLoaded) {
         onDataLoaded(sorted);
@@ -311,46 +326,43 @@ export default function StatsDashboard({
       console.error('走行距離データの読み込みエラー:', err);
       setError('スプレッドシートからのデータ取得に失敗しました。');
       setLoading(false);
-      setIsSyncing(false);
     }
   };
 
-  // マウント時にキャッシュがあればそれを読み込み、なければ取得する
+  // マウント時にキャッシュが無ければフェッチ。ある場合は初期レンダリング後にバックグラウンドフェッチ(SWR)のみを実行
   useEffect(() => {
-    setTimeout(() => {
-      const cachedData = localStorage.getItem(CACHE_KEY);
-      const cachedTs = localStorage.getItem(CACHE_TS_KEY);
+    const cachedData = localStorage.getItem(CACHE_KEY);
+    const cachedTs = localStorage.getItem(CACHE_TS_KEY);
 
-      if (cachedData && cachedTs) {
+    if (cachedData && cachedTs) {
+      if (onDataLoaded) {
         try {
           const parsed = JSON.parse(cachedData);
-          setMembers(parsed);
-          setLoading(false);
-          if (onDataLoaded) {
-            onDataLoaded(parsed);
-          }
-          // バックグラウンドで最新データをフェッチして更新する (SWR) - 強制キャッシュクリアでフェッチ
-          fetchAndParseData(true, true);
+          onDataLoaded(parsed);
         } catch (e) {
-          console.warn('キャッシュデータのパースに失敗しました。再取得します。', e);
-          fetchAndParseData(true, false);
+          console.warn('親コンポーネント通知用キャッシュパース失敗:', e);
         }
-      } else {
-        fetchAndParseData(true, false);
       }
-    }, 0);
+      // バックグラウンドで最新データをフェッチして更新する (SWR) - レンダリングサイクル後に実行して cascading render エラーを回避
+      setTimeout(() => {
+        fetchAndParseData(true, true);
+      }, 0);
+    } else {
+      // キャッシュが無い場合のみ、ローディング表示を伴う通常フェッチ - レンダリングサイクル後に実行して cascading render エラーを回避
+      setTimeout(() => {
+        fetchAndParseData(true, false);
+      }, 0);
+    }
 
     // バックグラウンドでの自動ロード連携リスナー
     const handleCacheUpdated = (e) => {
       const { members: newMembers } = e.detail;
-      setTimeout(() => {
-        setMembers(newMembers);
-        setLoading(false);
-        setError(null);
-        if (onDataLoaded) {
-          onDataLoaded(newMembers);
-        }
-      }, 0);
+      setMembers(newMembers);
+      setLoading(false);
+      setError(null);
+      if (onDataLoaded) {
+        onDataLoaded(newMembers);
+      }
     };
 
     window.addEventListener('tf_stats_cache_updated', handleCacheUpdated);
@@ -965,21 +977,6 @@ export default function StatsDashboard({
               </div>
               
               <div className="flex items-center gap-1.5">
-                {/* 手動同期ボタン */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fetchAndParseData(true, false);
-                  }}
-                  disabled={loading || isSyncing}
-                  className={`p-1.5 rounded-xl bg-slate-50 border border-slate-100 text-slate-400 hover:text-slate-700 active:scale-95 transition-all shadow-sm ${
-                    (loading || isSyncing) ? 'animate-spin text-blue-500 bg-blue-50/50' : ''
-                  }`}
-                  title="スプレッドシートから再同期"
-                >
-                  <RefreshCcw size={11} />
-                </button>
-
                 {/* 期間選択ドロップダウン (上品なライト仕様) */}
                 <div className="relative">
                   <button
@@ -1202,8 +1199,8 @@ export default function StatsDashboard({
       {showSection === 'ranking' && rankingDetailMember && (
         <div className="space-y-4">
           
-          {/* ← ランキングに戻るボタン (スクロール追従sticky仕様) */}
-          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+55px)] z-30 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 transition-all">
+          {/* ← ランキングに戻るボタン */}
+          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setRankingDetailMember('')}
@@ -1585,25 +1582,27 @@ export default function StatsDashboard({
       {showSection === 'analytics' && (
         <div className="space-y-4">
           
-          {/* iOS風メンバー選択トリガー (すっきりしたタップエリア、スクロール追従sticky仕様) */}
-          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+55px)] z-30 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 transition-all">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 font-black">
-                <User size={18} />
+          {/* iOS風メンバー選択トリガーの粘着コンテナ (ヘッダーとの美しい隙間を保ちつつ、スクロールコンテンツを下に綺麗に潜り込ませる) */}
+          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-20 bg-[#f8fafc] pt-2.5 pb-1">
+            <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 font-black">
+                  <User size={18} />
+                </div>
+                <div>
+                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">ANALYTICS TARGET</span>
+                  <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{selectedMember ? formatMemberName(selectedMember) : '部員を選択'}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">ANALYTICS TARGET</span>
-                <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{selectedMember ? formatMemberName(selectedMember) : '部員を選択'}</span>
-              </div>
+              
+              <button
+                onClick={() => setShowMemberSheet(true)}
+                className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
+              >
+                <span>部員を切り替え</span>
+                <ChevronRight size={13} />
+              </button>
             </div>
-            
-            <button
-              onClick={() => setShowMemberSheet(true)}
-              className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
-            >
-              <span>部員を切り替え</span>
-              <ChevronRight size={13} />
-            </button>
           </div>
 
           {!selectedMemberData ? (
@@ -1627,17 +1626,28 @@ export default function StatsDashboard({
                     <span className="text-sm text-slate-400 font-bold ml-1">km</span>
                   </p>
                   
-                  {/* 強度凡例リスト */}
-                  <div className="mt-4 space-y-1.5">
+                  {/* 強度凡例リスト (高さを完全に固定するため常に全5項目を表示し、選択中の項目以外は透過度を下げてフォーカスを表現) */}
+                  <div className="mt-4 space-y-1.5 min-h-[92px] flex flex-col justify-between">
                     {Object.entries(INTENSITY_COLORS).map(([key, item]) => {
                       const val = selectedMemberData[key] || 0;
-                      if (val <= 0) return null; // 0kmのものは表示しない
-                      if (sortKey !== 'total' && sortKey !== key) return null; // sortKey指定時はその項目のみ表示
                       const percent = selectedMemberData.total > 0 
                         ? Math.round((val / selectedMemberData.total) * 100) 
                         : 0;
+                      
+                      // 選択状態の判定: 
+                      // 1. sortKey が 'total' の場合は、その項目の値が 0 より大きければハイライト、0 なら薄く表示
+                      // 2. sortKey が特定の強度の場合は、その強度だけをハイライトし、それ以外は薄く表示
+                      const isHighlighted = sortKey === 'total' 
+                        ? val > 0 
+                        : sortKey === key;
+                      
                       return (
-                        <div key={key} className="flex items-center gap-1.5 text-[10px] font-bold">
+                        <div 
+                          key={key} 
+                          className={`flex items-center gap-1.5 text-[10px] font-bold transition-all duration-200 ${
+                            isHighlighted ? 'opacity-100 scale-100' : 'opacity-35 scale-[0.98]'
+                          }`}
+                        >
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.hex }} />
                           <span className="text-slate-500 block truncate max-w-[80px]">{item.name.split(' (')[0]}</span>
                           <span className="font-black text-slate-800 ml-auto">{val}km <span className="text-[8px] text-slate-400 font-medium ml-0.5">({percent}%)</span></span>
@@ -1995,6 +2005,28 @@ export default function StatsDashboard({
         </div>
       )}
 
+      {/* 📱 画面右下の上品なフローティング部員切り替えボタン (FAB) - スクロール中の部員切り替えを劇的にスムーズに */}
+      {showSection === 'analytics' && (
+        <button
+          onClick={() => setShowMemberSheet(true)}
+          className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white pl-4.5 pr-5 py-3 rounded-full shadow-[0_8px_30px_rgba(37,99,235,0.35)] active:scale-95 transition-all font-black text-xs border border-blue-500/20 active:bg-blue-700 cursor-pointer animate-fade-in"
+        >
+          <Users size={14} className="shrink-0" />
+          <span>部員切り替え</span>
+        </button>
+      )}
+
+      {/* 📱 ランキング詳細表示時用のフローティング戻るボタン */}
+      {showSection === 'ranking' && rankingDetailMember && (
+        <button
+          onClick={() => setRankingDetailMember('')}
+          className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white pl-4 pr-4.5 py-3 rounded-full shadow-[0_8px_30px_rgba(15,23,42,0.3)] active:scale-95 transition-all font-black text-xs border border-slate-700/20 active:bg-slate-900 cursor-pointer animate-fade-in"
+        >
+          <ChevronRight size={14} className="rotate-180 shrink-0" />
+          <span>戻る</span>
+        </button>
+      )}
+
       {/* 📱 メンバー選択シート (モバイルではボトムシート、PCでは中央モーダルにレスポンシブ対応 - React Portal化によりfixed崩れを100%防止) */}
       {showMemberSheet && createPortal(
         <>
@@ -2050,8 +2082,8 @@ export default function StatsDashboard({
               ))}
             </div>
             
-            {/* リストエリア (スクロール可、親指で押しやすい2列グリッド) */}
-            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2.5 pb-12 max-h-[50vh]">
+            {/* リストエリア (スクロール可、親指で押しやすい2列グリッド - 高さを固定して学年切り替え時のガタつきを完全に防止) */}
+            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2.5 pb-6 h-[320px] min-h-[320px] content-start">
               {(() => {
                 const filtered = members.filter(m => !modalGrade || getGradeFromName(m.name) === modalGrade);
                 if (filtered.length === 0) {
