@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle } from 'lucide-react';
 import { fetchSheetList, fetchMemberPracticeData, hasConfig } from '../services/sheetsService';
 
@@ -1994,8 +1995,8 @@ export default function StatsDashboard({
         </div>
       )}
 
-      {/* 📱 メンバー選択シート (モバイルではボトムシート、PCでは中央モーダルにレスポンシブ対応) */}
-      {showMemberSheet && (
+      {/* 📱 メンバー選択シート (モバイルではボトムシート、PCでは中央モーダルにレスポンシブ対応 - React Portal化によりfixed崩れを100%防止) */}
+      {showMemberSheet && createPortal(
         <>
           {/* 黒背景オーバーレイ */}
           <div 
@@ -2095,7 +2096,8 @@ export default function StatsDashboard({
               })()}
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
 
     </div>
