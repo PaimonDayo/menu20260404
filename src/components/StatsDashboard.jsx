@@ -265,6 +265,8 @@ export default function StatsDashboard({
               records: records
             };
           }
+          // 中長距離以外の部員（records === null）の場合は null を返す
+          return null;
         } catch (err) {
           if (retries > 0) {
             console.warn(`メンバー「${sheet.name}」のフェッチ失敗。200ms後に再試行します...`, err);
@@ -273,7 +275,6 @@ export default function StatsDashboard({
           }
           throw err;
         }
-        throw new Error('データの返却値が null です');
       };
 
       // 順行フェッチを行うワーカーを起動
@@ -283,7 +284,9 @@ export default function StatsDashboard({
           if (!sheet) continue;
           try {
             const memberData = await fetchWithRetry(sheet, 1);
-            results.push(memberData);
+            if (memberData !== null) {
+              results.push(memberData);
+            }
           } catch (err) {
             console.error(`メンバー「${sheet.name}」のデータ取得に完全に失敗しました。キャッシュから復元します:`, err);
             // 過去のキャッシュがあれば復元して救済
@@ -2037,7 +2040,7 @@ export default function StatsDashboard({
           />
           
           {/* シート本体 */}
-          <div className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] max-h-[80vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden animate-slide-up md:animate-fade-in pb-safe">
+          <div className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden animate-slide-up md:animate-fade-in pb-safe">
             {/* ハンドルバー (モバイルのみ表示) */}
             <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto my-3.5 shrink-0 md:hidden" />
             
@@ -2082,8 +2085,8 @@ export default function StatsDashboard({
               ))}
             </div>
             
-            {/* リストエリア (スクロール可、親指で押しやすい2列グリッド - 高さを固定して学年切り替え時のガタつきを完全に防止) */}
-            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2.5 pb-6 h-[320px] min-h-[320px] content-start">
+            {/* リストエリア (スクロール可、親指で押しやすい2列グリッド - シート全体の高さ固定化に伴い flex-1 で高さを一定に保持) */}
+            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-2.5 pb-6 content-start">
               {(() => {
                 const filtered = members.filter(m => !modalGrade || getGradeFromName(m.name) === modalGrade);
                 if (filtered.length === 0) {
