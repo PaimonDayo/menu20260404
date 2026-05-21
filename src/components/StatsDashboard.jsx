@@ -2056,16 +2056,6 @@ export default function StatsDashboard({
         </div>
       )}
 
-      {/* 📱 画面右下の上品なフローティング部員切り替えボタン (FAB) - スクロール中の部員切り替えを劇的にスムーズに */}
-      {showSection === 'analytics' && (
-        <button
-          onClick={() => setShowMemberSheet(true)}
-          className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white pl-4.5 pr-5 py-3 rounded-full shadow-[0_8px_30px_rgba(37,99,235,0.35)] active:scale-95 transition-all font-black text-xs border border-blue-500/20 active:bg-blue-700 cursor-pointer animate-fade-in"
-        >
-          <Users size={14} className="shrink-0" />
-          <span>部員切り替え</span>
-        </button>
-      )}
 
       {/* 📱 ランキング詳細表示時用のフローティング戻るボタン */}
       {showSection === 'ranking' && rankingDetailMember && (
