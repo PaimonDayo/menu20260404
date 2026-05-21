@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle } from 'lucide-react';
 import { fetchSheetList, fetchMemberPracticeData, hasConfig } from '../services/sheetsService';
@@ -166,6 +166,11 @@ export default function StatsDashboard({
 
   const [error, setError] = useState(null);
 
+  // 📱 メンバー選択シートのドラッグクローズ用ステート＆Ref
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const touchStartY = useRef(0);
+
   const todayIso = useMemo(() => getTodayIso(), []);
 
   // アウトサイドクリックでドロップダウンを閉じる
@@ -178,6 +183,38 @@ export default function StatsDashboard({
       document.removeEventListener('click', handleOutsideClick);
     };
   }, []);
+
+  // 📱 メンバー選択シートのタッチドラッグ処理
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e) => {
+    if (!touchStartY.current) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = currentY - touchStartY.current;
+    
+    // 下方向へのドラッグのみOffsetYを反映
+    const offset = Math.max(0, deltaY);
+    setDragOffsetY(offset);
+    
+    // スクロールなどの規定の動作を防止
+    if (offset > 0 && e.cancelable) {
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+    if (dragOffsetY > 100) {
+      // 100px以上下にドラッグした場合は閉じる
+      setShowMemberSheet(false);
+    }
+    // dragOffsetY を 0 に戻す
+    setDragOffsetY(0);
+    touchStartY.current = 0;
+  };
 
   // 存在するユニークな学年リスト
   const gradeList = useMemo(() => {
@@ -621,7 +658,7 @@ export default function StatsDashboard({
     return { limit, ticks };
   }, [selectedMemberData, sortKey]);
 
-  // ドーナツグラフ（SVG）用の計算 (ライトモード・ソフトシャドウ仕様)
+  // ドーナツグラフ（SVG）用の計算 (ライトモード・ソフトシャドウ仕様 - 常に全強度の割合で円を100%埋める)
   const donutData = useMemo(() => {
     if (!selectedMemberData || selectedMemberData.total === 0) return [];
     
@@ -634,15 +671,14 @@ export default function StatsDashboard({
       { key: 'unclassified', val: unclassified, color: INTENSITY_COLORS.unclassified.hex },
     ];
 
-    const items = sortKey === 'total' 
-      ? allItems.filter(item => item.val > 0)
-      : allItems.filter(item => item.key === sortKey && item.val > 0);
+    // sortKey にかかわらず、常に全強度の割合を表示
+    const items = allItems.filter(item => item.val > 0);
 
     const radius = 50;
     const circumference = 2 * Math.PI * radius;
     let accumulatedAngle = 0;
 
-    const displayTotal = sortKey === 'total' ? total : (selectedMemberData[sortKey] || 0);
+    const displayTotal = total;
 
     return items.map(item => {
       const percentage = displayTotal > 0 ? (item.val / displayTotal) * 100 : 0;
@@ -657,7 +693,7 @@ export default function StatsDashboard({
         strokeOffset
       };
     });
-  }, [selectedMemberData, sortKey]);
+  }, [selectedMemberData]);
 
   // ランキング詳細表示用のメンバーデータ
   const rankingDetailMemberData = useMemo(() => {
@@ -2040,12 +2076,28 @@ export default function StatsDashboard({
           />
           
           {/* シート本体 */}
-          <div className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden animate-slide-up md:animate-fade-in pb-safe">
-            {/* ハンドルバー (モバイルのみ表示) */}
-            <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto my-3.5 shrink-0 md:hidden" />
+          <div 
+            className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden animate-slide-up md:animate-fade-in pb-safe"
+            style={{
+              transform: `translateY(${dragOffsetY}px) ${window.innerWidth >= 768 ? 'translate(-50%, -50%)' : ''}`,
+              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* ハンドルバー (モバイルのみ表示 - タッチドラッグで閉じるエリア) */}
+            <div 
+              className="w-12 h-1 bg-slate-200 rounded-full mx-auto my-3.5 shrink-0 md:hidden cursor-grab active:cursor-grabbing"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            />
             
-            {/* ヘッダー */}
-            <div className="px-5 py-4 flex justify-between items-center border-b border-slate-50 shrink-0">
+            {/* ヘッダー - タッチドラッグで閉じるエリア */}
+            <div 
+              className="px-5 py-4 flex justify-between items-center border-b border-slate-50 shrink-0 select-none cursor-grab active:cursor-grabbing"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               <div>
                 <h3 className="text-base font-black text-slate-800">部員を選択</h3>
                 <p className="text-[9px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wider">Tap to change statistics targets</p>
