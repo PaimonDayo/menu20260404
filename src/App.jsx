@@ -558,8 +558,8 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col pb-24">
 
-      {/* ── 📱 Header ── (一切の帯を省いたスマートヘッダー) */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 py-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+      {/* ── 📱 Header ── (一切の帯を省いたスマートヘッダー、PWAステータスバーSafe Area対応) */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div>

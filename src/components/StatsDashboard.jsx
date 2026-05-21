@@ -177,9 +177,8 @@ export default function StatsDashboard({
   // membersが読み込まれた時の初期設定
   useEffect(() => {
     if (members.length > 0 && !selectedMember) {
-      // ユーザーの初期状態をセット。B2部員がいるか確認
-      const b2Members = members.filter(m => getGradeFromName(m.name) === 'B2');
-      const defaultMember = b2Members.length > 0 ? b2Members[0] : members[0];
+      // ユーザーの初期状態をセット。全学年の最初のメンバーをデフォルトメンバーとする
+      const defaultMember = members[0];
       
       setTimeout(() => {
         setSelectedMember(defaultMember.name);
@@ -891,7 +890,7 @@ export default function StatsDashboard({
       {showSection === 'ranking' && !rankingDetailMember && (
         <div className="space-y-4">
           
-          {/* 👑 B2表彰台 (Podium Grafics) */}
+          {/* 👑 表彰台 (Podium Graphics) */}
           {podiumLayout.length > 0 && (
             <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3.5">
               <div className="flex items-center gap-1">
@@ -1202,8 +1201,8 @@ export default function StatsDashboard({
       {showSection === 'ranking' && rankingDetailMember && (
         <div className="space-y-4">
           
-          {/* ← ランキングに戻るボタン */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
+          {/* ← ランキングに戻るボタン (スクロール追従sticky仕様) */}
+          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+55px)] z-30 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 transition-all">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setRankingDetailMember('')}
@@ -1585,8 +1584,8 @@ export default function StatsDashboard({
       {showSection === 'analytics' && (
         <div className="space-y-4">
           
-          {/* iOS風メンバー選択トリガー (すっきりしたタップエリア) */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
+          {/* iOS風メンバー選択トリガー (すっきりしたタップエリア、スクロール追従sticky仕様) */}
+          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+55px)] z-30 bg-white/95 backdrop-blur-md border border-slate-100 rounded-2xl p-3.5 shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex items-center justify-between gap-3 transition-all">
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 font-black">
                 <User size={18} />
