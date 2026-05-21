@@ -169,7 +169,18 @@ export default function StatsDashboard({
   // 📱 メンバー選択シートのドラッグクローズ用ステート＆Ref
   const [dragOffsetY, setDragOffsetY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const [isClosing, setIsClosing] = useState(false); // iOS風メンバー選択シートのクローズアニメーション状態
   const touchStartY = useRef(0);
+
+  // 📱 メンバー選択シートをアニメーション付きで閉じる共通関数
+  const closeMemberSheet = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setShowMemberSheet(false);
+      setIsClosing(false);
+      setDragOffsetY(0);
+    }, 300);
+  };
 
   const todayIso = useMemo(() => getTodayIso(), []);
 
@@ -209,10 +220,11 @@ export default function StatsDashboard({
     setIsDragging(false);
     if (dragOffsetY > 100) {
       // 100px以上下にドラッグした場合は閉じる
-      setShowMemberSheet(false);
+      closeMemberSheet();
+    } else {
+      // dragOffsetY を 0 に戻す
+      setDragOffsetY(0);
     }
-    // dragOffsetY を 0 に戻す
-    setDragOffsetY(0);
     touchStartY.current = 0;
   };
 
@@ -676,15 +688,15 @@ export default function StatsDashboard({
 
     const radius = 50;
     const circumference = 2 * Math.PI * radius;
-    let accumulatedAngle = 0;
+    let accumulatedLength = 0;
 
     const displayTotal = total;
 
     return items.map(item => {
       const percentage = displayTotal > 0 ? (item.val / displayTotal) * 100 : 0;
       const strokeLength = displayTotal > 0 ? (item.val / displayTotal) * circumference : 0;
-      const strokeOffset = circumference - strokeLength + accumulatedAngle;
-      accumulatedAngle -= strokeLength;
+      const strokeOffset = -accumulatedLength;
+      accumulatedLength += strokeLength;
 
       return {
         ...item,
@@ -886,15 +898,15 @@ export default function StatsDashboard({
 
     const radius = 50;
     const circumference = 2 * Math.PI * radius;
-    let accumulatedAngle = 0;
+    let accumulatedLength = 0;
 
     const displayTotal = total;
 
     return items.map(item => {
       const percentage = displayTotal > 0 ? (item.val / displayTotal) * 100 : 0;
       const strokeLength = displayTotal > 0 ? (item.val / displayTotal) * circumference : 0;
-      const strokeOffset = circumference - strokeLength + accumulatedAngle;
-      accumulatedAngle -= strokeLength;
+      const strokeOffset = -accumulatedLength;
+      accumulatedLength += strokeLength;
 
       return {
         ...item,
@@ -1317,7 +1329,7 @@ export default function StatsDashboard({
                           strokeWidth="12"
                           strokeDasharray={item.strokeDash}
                           strokeDashoffset={item.strokeOffset}
-                          strokeLinecap={rankingDetailDonutData.length === 1 ? 'butt' : 'round'}
+                          strokeLinecap="butt"
                           className="transition-all duration-500"
                         />
                       ))
@@ -1712,7 +1724,7 @@ export default function StatsDashboard({
                           strokeWidth="12"
                           strokeDasharray={item.strokeDash}
                           strokeDashoffset={item.strokeOffset}
-                          strokeLinecap={donutData.length === 1 ? 'butt' : 'round'}
+                          strokeLinecap="butt"
                           className="transition-all duration-500"
                         />
                       ))
@@ -2071,16 +2083,25 @@ export default function StatsDashboard({
         <>
           {/* 黒背景オーバーレイ */}
           <div 
-            className="fixed inset-0 bg-slate-900/40 z-45 backdrop-blur-sm animate-fade-in"
-            onClick={() => setShowMemberSheet(false)}
+            className="fixed inset-0 bg-slate-900/40 z-45 backdrop-blur-sm"
+            style={{
+              opacity: isClosing ? 0 : 1,
+              transition: 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onClick={closeMemberSheet}
           />
           
           {/* シート本体 */}
           <div 
-            className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden animate-slide-up md:animate-fade-in pb-safe"
+            className={`fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden pb-safe ${
+              isClosing ? '' : 'animate-slide-up md:animate-fade-in'
+            }`}
             style={{
-              transform: `translateY(${dragOffsetY}px) ${window.innerWidth >= 768 ? 'translate(-50%, -50%)' : ''}`,
-              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+              transform: `translateY(${isClosing ? (window.innerWidth >= 768 ? '0px' : '100%') : `${dragOffsetY}px`}) ${
+                window.innerWidth >= 768 ? `translate(-50%, -50%) ${isClosing ? 'scale(0.95)' : 'scale(1)'}` : ''
+              }`,
+              opacity: isClosing ? 0 : 1,
+              transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
           >
             {/* ハンドルバー (モバイルのみ表示 - タッチドラッグで閉じるエリア) */}
@@ -2103,7 +2124,7 @@ export default function StatsDashboard({
                 <p className="text-[9px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wider">Tap to change statistics targets</p>
               </div>
               <button 
-                onClick={() => setShowMemberSheet(false)}
+                onClick={closeMemberSheet}
                 className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 active:scale-95 transition-all shadow-sm"
               >
                 <X size={15} />
@@ -2158,7 +2179,7 @@ export default function StatsDashboard({
                       key={m.name}
                       onClick={() => {
                         setSelectedMember(m.name);
-                        setShowMemberSheet(false);
+                        closeMemberSheet();
                       }}
                       className={`flex items-center gap-2.5 p-3.5 rounded-2xl border text-left transition-all ${
                         isSelected 
