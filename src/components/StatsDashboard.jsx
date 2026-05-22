@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle } from 'lucide-react';
-import { fetchSheetList, fetchMemberPracticeData, hasConfig } from '../services/sheetsService';
+import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send } from 'lucide-react';
+import { fetchAllMembersStats, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply } from '../services/sheetsService';
 
 // 強度別のプレミアム・パステルカラー設定 (スプレッドシート準拠の配色)
 const INTENSITY_COLORS = {
@@ -24,6 +24,85 @@ const PERIODS = {
 const getTodayIso = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+const hasTimelineContent = (rec) => {
+  if (!rec) return false;
+  return Number(rec.total || 0) > 0
+    || Number(rec.jog || 0) > 0
+    || Number(rec.mlt || 0) > 0
+    || Number(rec.cv || 0) > 0
+    || Number(rec.speed || 0) > 0
+    || Number(rec.strides || 0) > 0
+    || Boolean((rec.menu || '').trim())
+    || Boolean((rec.result || '').trim())
+    || Boolean((rec.reinforce || '').trim())
+    || Boolean((rec.comment || '').trim())
+    || (Array.isArray(rec.replies) && rec.replies.some(reply => Boolean((reply || '').trim())));
+};
+
+const TimelineRecordFields = ({ rec, focusKey = 'total' }) => {
+  if (!rec) return null;
+
+  const items = [
+    ['jog', 'jog', rec.jog, 'km'],
+    ['mlt', 'M-LT', rec.mlt, 'km'],
+    ['cv', 'CV-VO2', rec.cv, 'km'],
+    ['speed', 'Speed', rec.speed, 'km'],
+    ['strides', '流し', rec.strides, '本'],
+  ]
+    .map(([key, label, value, unit]) => ({ key, label, value: Math.round(Number(value || 0) * 100) / 100, unit }))
+    .filter(item => item.value > 0);
+
+  const hasText = Boolean((rec.reinforce || '').trim()) || Boolean((rec.result || '').trim()) || Boolean((rec.comment || '').trim());
+  if (items.length === 0 && !hasText) return null;
+
+  return (
+    <div className="space-y-2 relative z-10">
+      {items.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map(item => {
+            const color = item.key === 'strides'
+              ? { hex: '#64748b', bg: '#f8fafc', text: '#475569', border: '#e2e8f0' }
+              : INTENSITY_COLORS[item.key];
+            const isFocused = focusKey === 'total' || focusKey === item.key || item.key === 'strides';
+            return (
+              <span
+                key={item.key}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-black transition-opacity ${isFocused ? 'opacity-100' : 'opacity-45'}`}
+                style={{ backgroundColor: color.bg, borderColor: color.border }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color.hex }} />
+                <span style={{ color: color.text }}>{item.label}</span>
+                <span className="text-slate-800">{item.value}{item.unit}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
+
+      {rec.reinforce && (
+        <div className="rounded-2xl bg-[#f2f2f7] border border-slate-100 px-3 py-2">
+          <div className="text-[9px] font-black text-slate-400 leading-none">補強(ウェイト)</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-700 whitespace-pre-wrap">{rec.reinforce}</div>
+        </div>
+      )}
+
+      {rec.result && (
+        <div className="rounded-2xl bg-blue-50/60 border border-blue-100 px-3 py-2">
+          <div className="text-[9px] font-black text-blue-400 leading-none">結果</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-700 whitespace-pre-wrap">{rec.result}</div>
+        </div>
+      )}
+
+      {rec.comment && (
+        <div className="rounded-2xl bg-slate-50/70 border border-slate-100 px-3 py-2">
+          <div className="text-[9px] font-black text-slate-400 leading-none">感想</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-600 whitespace-pre-wrap">{rec.comment}</div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ヘルパー: 日付が期間内かチェック
@@ -112,7 +191,9 @@ export default function StatsDashboard({
   showSection = 'ranking', 
   onDataLoaded = null,
   selectedMember = '',
-  setSelectedMember = () => {}
+  setSelectedMember = () => {},
+  onOpenInputDrawer = null,
+  resetSignal = 0
 }) {
   const [period, setPeriod] = useState('month'); // 'week' | 'month' | 'lastMonth' | 'total'
   const [sortKey, setSortKey] = useState('total'); // 'total' | 'jog' | 'mlt' | 'cv' | 'speed'
@@ -124,6 +205,19 @@ export default function StatsDashboard({
   const [showAllRanking, setShowAllRanking] = useState(false); // もっと見るフラグ
   const [rankingDetailMember, setRankingDetailMember] = useState(''); // ランキング内詳細表示部員名
   const [modalGrade, setModalGrade] = useState(''); // モーダル内学年フィルター
+  const [replyDrafts, setReplyDrafts] = useState({});
+  const [replySubmittingKey, setReplySubmittingKey] = useState('');
+
+  useEffect(() => {
+    if (!resetSignal) return;
+    setActiveDailyIdx(null);
+    setActiveMonthIdx(null);
+    setShowMemberSheet(false);
+    if (showSection === 'ranking') {
+      setRankingDetailMember('');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [resetSignal, showSection]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -287,6 +381,27 @@ export default function StatsDashboard({
         } catch (e) {
           console.warn('既存キャッシュのパース失敗:', e);
         }
+      }
+
+      try {
+        const gasMembers = await fetchAllMembersStats(force);
+        if (Array.isArray(gasMembers)) {
+          const sorted = gasMembers.sort((a, b) => a.name.localeCompare(b.name));
+          setMembers(sorted);
+          localStorage.setItem(CACHE_KEY, JSON.stringify(sorted));
+          const nowStr = new Date().toLocaleString('ja-JP', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          localStorage.setItem(CACHE_TS_KEY, nowStr);
+          setLoading(false);
+          if (onDataLoaded) onDataLoaded(sorted);
+          return;
+        }
+      } catch (err) {
+        console.warn('GAS経由の部員データ取得に失敗しました。CSV取得へフォールバックします。', err);
       }
       
       const sheetList = await fetchSheetList();
@@ -454,7 +569,6 @@ export default function StatsDashboard({
         unclassified: round(stats.unclassified),
       };
     })
-    .filter(m => m.total > 0)
     .filter(m => {
       if (!rankingGrade) return true;
       return getGradeFromName(m.name) === rankingGrade;
@@ -465,22 +579,6 @@ export default function StatsDashboard({
       return valB - valA;
     });
   }, [members, period, sortKey, todayIso, rankingGrade]);
-
-  // 表彰台トップ3の選出
-  const podiumMembers = useMemo(() => {
-    if (rankingData.length === 0) return [];
-    return rankingData.slice(0, 3);
-  }, [rankingData]);
-
-  // 表彰台表示用の並び替え [2位, 1位, 3位] の順
-  const podiumLayout = useMemo(() => {
-    if (podiumMembers.length === 0) return [];
-    const layout = [];
-    if (podiumMembers[1]) layout.push({ member: podiumMembers[1], rank: 2 }); // 2位
-    if (podiumMembers[0]) layout.push({ member: podiumMembers[0], rank: 1 }); // 1位
-    if (podiumMembers[2]) layout.push({ member: podiumMembers[2], rank: 3 }); // 3位
-    return layout;
-  }, [podiumMembers]);
 
   // ランキングの絶対物理スケール上限値とグリッド ticks の計算
   const rankingScale = useMemo(() => {
@@ -494,6 +592,46 @@ export default function StatsDashboard({
   const displayedRanking = useMemo(() => {
     return showAllRanking ? rankingData : rankingData.slice(0, 10);
   }, [rankingData, showAllRanking]);
+
+  const latestSocialRecords = useMemo(() => {
+    return members
+      .flatMap(member => (member.records || []).map(record => ({
+        ...record,
+        memberName: member.name,
+      })))
+      .filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 10);
+  }, [members, todayIso]);
+
+  const handleSubmitReply = async (memberName, date) => {
+    const key = `${memberName}__${date}`;
+    const reply = (replyDrafts[key] || '').trim();
+    if (!reply) return;
+
+    setReplySubmittingKey(key);
+    try {
+      await submitRecordReply({ memberName, date, reply });
+      setMembers(prev => prev.map(member => {
+        if (member.name !== memberName) return member;
+        return {
+          ...member,
+          records: member.records.map(record => {
+            if (record.date !== date) return record;
+            return {
+              ...record,
+              replies: [...(record.replies || []), reply],
+            };
+          }),
+        };
+      }));
+      setReplyDrafts(prev => ({ ...prev, [key]: '' }));
+    } catch (err) {
+      window.alert(`リプライの送信に失敗しました: ${err.message}`);
+    } finally {
+      setReplySubmittingKey('');
+    }
+  };
 
   // 選択されたメンバーの集計データ
   const selectedMemberData = useMemo(() => {
@@ -515,7 +653,9 @@ export default function StatsDashboard({
         stats.unclassified += Math.max(0, r.total - detailSum);
       }
       
-      dailyRecords.push(r);
+      if (r.date && r.date <= todayIso) {
+        dailyRecords.push(r);
+      }
 
       if (r.date) {
         const monthKey = r.date.substring(0, 7); // 'YYYY-MM'
@@ -561,7 +701,7 @@ export default function StatsDashboard({
       speed: round(stats.speed),
       unclassified: round(stats.unclassified),
       trend: trendList,
-      daily: dailyRecords.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+      daily: dailyRecords.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30)
     };
   }, [members, selectedMember, period, todayIso]);
 
@@ -728,7 +868,9 @@ export default function StatsDashboard({
         stats.unclassified += Math.max(0, r.total - detailSum);
       }
       
-      dailyRecords.push(r);
+      if (r.date && r.date <= todayIso) {
+        dailyRecords.push(r);
+      }
 
       if (r.date) {
         const monthKey = r.date.substring(0, 7); // 'YYYY-MM'
@@ -773,7 +915,7 @@ export default function StatsDashboard({
       speed: round(stats.speed),
       unclassified: round(stats.unclassified),
       trend: trendList,
-      daily: dailyRecords.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 10)
+      daily: dailyRecords.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30)
     };
   }, [members, rankingDetailMember, period, todayIso]);
 
@@ -953,69 +1095,54 @@ export default function StatsDashboard({
       {/* 🏆 Tab 2: ランキング表示 */}
       {showSection === 'ranking' && !rankingDetailMember && (
         <div className="space-y-4">
-          
-          {/* 👑 表彰台 (Podium Graphics) */}
-          {podiumLayout.length > 0 && (
-            <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3.5">
-              <div className="flex items-center gap-1">
-                <Trophy size={14} className="text-amber-500" />
-                <span className="text-[10px] text-slate-400 font-black tracking-wider uppercase">表彰台 (今月のTOP3)</span>
+          <div className="ios-card rounded-[28px] p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-lg bg-[#f2f2f7] flex items-center justify-center text-[#007aff]">
+                  <Activity size={13} />
+                </div>
+                <h3 className="text-sm font-black text-slate-800">最新の練習記録</h3>
               </div>
-              
-              <div className="flex items-end justify-center gap-3 pt-8 px-1">
-                {podiumLayout.map(({ member, rank }) => {
-                  const is1st = rank === 1;
-                  const is2nd = rank === 2;
-                  const nameOnly = getOnlyName(member.name);
-                  
-                  // 各ランクに応じた装飾
-                  const cardBg = is1st 
-                    ? 'bg-gradient-to-t from-amber-50 to-amber-100/30 border-amber-200' 
-                    : is2nd 
-                      ? 'bg-gradient-to-t from-slate-50 to-slate-100/30 border-slate-200' 
-                      : 'bg-gradient-to-t from-orange-50 to-orange-100/30 border-orange-100';
+              <span className="text-[10px] font-bold text-slate-400">10件</span>
+            </div>
 
-                  const badgeBg = is1st 
-                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20' 
-                    : is2nd 
-                      ? 'bg-slate-400 text-white' 
-                      : 'bg-orange-400 text-white';
-
-                  const heightClass = is1st ? 'h-[125px]' : is2nd ? 'h-[100px]' : 'h-[90px]';
-                  const shadowClass = is1st ? 'shadow-[0_8px_24px_rgba(245,158,11,0.08)]' : 'shadow-sm';
-
+            {latestSocialRecords.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+                まだ練習記録がありません
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {latestSocialRecords.map((rec, idx) => {
+                  const dateText = rec.date ? rec.date.substring(5).replace('-', '/') : '';
+                  const replyCount = rec.replies?.length || 0;
                   return (
-                    <div key={member.name} className="flex-1 relative">
-                      {/* 王冠やメダルアイコン (台座の上に絶対配置) */}
-                      <div className={`absolute -top-7 left-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black z-20 ${badgeBg}`}>
-                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉'}
+                    <button
+                      key={`${rec.memberName}-${rec.date}-${idx}`}
+                      onClick={() => setRankingDetailMember(rec.memberName)}
+                      className="w-full text-left p-3 rounded-2xl bg-white border border-slate-100 hover:bg-[#f2f2f7]/60 active:scale-[0.99] transition-all"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-[9px] text-slate-400 font-black block leading-none">{dateText}</span>
+                          <span className="text-xs font-black text-slate-800 block mt-1 truncate">{formatMemberName(rec.memberName)}</span>
+                        </div>
+                        <span className="text-xs font-black text-[#007aff] shrink-0">
+                          {rec.total || 0}<span className="text-[8px] text-slate-400 ml-0.5">km</span>
+                        </span>
                       </div>
-                      
-                      {/* 台座 (クリックでランキング内詳細表示) */}
-                      <button 
-                        onClick={() => {
-                          setRankingDetailMember(member.name);
-                        }}
-                        className={`w-full ${heightClass} ${cardBg} border rounded-2xl flex flex-col justify-between p-2.5 text-center cursor-pointer transition-all active:scale-95 ${shadowClass} hover:opacity-90 relative z-10`}
-                      >
-                        <div className="min-w-0 w-full">
-                          <span className="text-[8px] font-black text-slate-400 block leading-none mb-0.5">{getGradeFromName(member.name)}</span>
-                          <span className={`text-[11px] font-black text-slate-800 block truncate ${is1st ? 'text-amber-800' : ''}`}>{nameOnly}</span>
-                        </div>
-                        
-                        <div className="w-full">
-                          <span className={`text-[14px] font-black tracking-tight inline-block ${is1st ? 'text-amber-600 text-[16px]' : 'text-slate-700'}`}>
-                            {member[sortKey]}
-                            <span className="text-[8px] font-bold text-slate-400 ml-0.5">km</span>
-                          </span>
-                        </div>
-                      </button>
-                    </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
+                        {rec.result && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-700 truncate max-w-full">{rec.result}</span>}
+                        {rec.strides > 0 && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">流し {rec.strides}本</span>}
+                        {rec.reinforce && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">補強</span>}
+                        {replyCount > 0 && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-[#007aff]">リプライ {replyCount}</span>}
+                      </div>
+                      {rec.comment && <p className="mt-2 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{rec.comment}</p>}
+                    </button>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* 🏆 ランキングカード */}
           <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-4">
@@ -1251,7 +1378,7 @@ export default function StatsDashboard({
         <div className="space-y-4">
           
           {/* ← ランキングに戻るボタン */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
+          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+64px)] z-20 ios-surface rounded-[28px] p-3.5 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setRankingDetailMember('')}
@@ -1260,16 +1387,17 @@ export default function StatsDashboard({
                 <ChevronRight size={18} className="rotate-180" />
               </button>
               <div>
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">MEMBER DETAIL</span>
+                <span className="text-[9px] font-bold text-slate-400 block leading-none">メンバー</span>
                 <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{rankingDetailMember ? formatMemberName(rankingDetailMember) : ''}</span>
               </div>
             </div>
             
             <button
-              onClick={() => setRankingDetailMember('')}
-              className="flex items-center gap-1 bg-slate-50 border border-slate-100 text-slate-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
+              onClick={() => setShowMemberSheet(true)}
+              className="flex items-center gap-1 bg-[#f2f2f7] text-slate-700 px-3.5 py-2.5 rounded-2xl text-xs font-black active:scale-95 transition-all"
             >
-              <span>ランキングに戻る</span>
+              <span>切り替え</span>
+              <ChevronRight size={13} />
             </button>
           </div>
 
@@ -1567,12 +1695,12 @@ export default function StatsDashboard({
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1 block">練習活動タイムライン</h4>
                 
                 <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
-                  {rankingDetailMemberData.daily.length === 0 ? (
+                  {rankingDetailMemberData.daily.filter(hasTimelineContent).length === 0 ? (
                     <div className="text-center py-6 text-slate-400 text-xs font-bold border border-dashed border-slate-100 rounded-2xl bg-white shadow-sm">
                       活動タイムラインの記録がありません
                     </div>
                   ) : (
-                    rankingDetailMemberData.daily.map((rec, i) => {
+                    rankingDetailMemberData.daily.filter(hasTimelineContent).map((rec, i) => {
                       const recUnclassified = Math.max(0, rec.total - (rec.jog + rec.mlt + rec.cv + rec.speed));
                       const hasMetrics = rec.jog > 0 || rec.mlt > 0 || rec.cv > 0 || rec.speed > 0 || recUnclassified > 0;
                       const dateText = rec.date ? rec.date.substring(5).replace('-', '/') : '日付不明';
@@ -1585,7 +1713,7 @@ export default function StatsDashboard({
                             <div className="absolute -left-[5px] top-3 w-2 h-2 bg-white border-l border-b border-slate-100 transform rotate-45" />
                             
                             <div className="flex justify-between items-center text-[10px] font-black text-slate-400 relative z-10">
-                              <span>{dateText} の練習記録</span>
+                              <span>{dateText}</span>
                               <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider shadow-sm">
                                 {rec.total} km
                               </span>
@@ -1603,17 +1731,40 @@ export default function StatsDashboard({
                               </div>
                             )}
 
-                            <div className="space-y-1 relative z-10 text-xs">
+                            <TimelineRecordFields rec={rec} />
+
+                            <div className="space-y-2 relative z-10 text-xs">
                               {rec.menu && (
                                 <p className="text-slate-700 font-extrabold leading-snug">
-                                  <span className="text-[9px] text-slate-400 font-black mr-1 uppercase">メニュー:</span>
+                                  <span className="text-[9px] text-slate-400 font-black mr-1">メニュー</span>
                                   {rec.menu}
                                 </p>
                               )}
+                              {rec.replies?.length > 0 && (
+                                <div className="space-y-1.5 pl-2 border-l-2 border-[#f2f2f7]">
+                                  {rec.replies.map((reply, replyIdx) => (
+                                    <p key={replyIdx} className="text-[10px] leading-relaxed text-slate-500 bg-[#f2f2f7]/70 rounded-2xl px-3 py-2">{reply}</p>
+                                  ))}
+                                </div>
+                              )}
                               {rec.comment && (
-                                <p className="text-slate-500 leading-relaxed font-bold bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100/50 mt-1.5 italic">
-                                  &ldquo;{rec.comment}&rdquo;
-                                </p>
+                                <div className="flex items-center gap-2 pt-1">
+                                  <input
+                                    type="text"
+                                    value={replyDrafts[`${rankingDetailMember}__${rec.date}`] || ''}
+                                    onChange={(e) => setReplyDrafts(prev => ({ ...prev, [`${rankingDetailMember}__${rec.date}`]: e.target.value }))}
+                                    placeholder="リプライ"
+                                    className="flex-1 min-w-0 px-3 py-2 rounded-full bg-[#f2f2f7] text-[11px] font-bold text-slate-700 focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSubmitReply(rankingDetailMember, rec.date)}
+                                    disabled={replySubmittingKey === `${rankingDetailMember}__${rec.date}`}
+                                    className="w-8 h-8 rounded-full bg-[#007aff] text-white flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all"
+                                  >
+                                    {replySubmittingKey === `${rankingDetailMember}__${rec.date}` ? <RefreshCcw size={12} className="animate-spin" /> : <Send size={12} />}
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1641,18 +1792,29 @@ export default function StatsDashboard({
                   <User size={18} />
                 </div>
                 <div>
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block leading-none">ANALYTICS TARGET</span>
+                  <span className="text-[9px] font-bold text-slate-400 block leading-none">マイページ</span>
                   <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{selectedMember ? formatMemberName(selectedMember) : '部員を選択'}</span>
                 </div>
               </div>
               
-              <button
-                onClick={() => setShowMemberSheet(true)}
-                className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
-              >
-                <span>部員を切り替え</span>
-                <ChevronRight size={13} />
-              </button>
+              <div className="flex items-center gap-2">
+                {onOpenInputDrawer && selectedMember && (
+                  <button
+                    onClick={onOpenInputDrawer}
+                    className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
+                  >
+                    <Activity size={13} />
+                    <span>記録を入力</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowMemberSheet(true)}
+                  className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
+                >
+                  <span>切り替え</span>
+                  <ChevronRight size={13} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1983,12 +2145,12 @@ export default function StatsDashboard({
                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1 block">練習活動タイムライン</h4>
                 
                 <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
-                  {selectedMemberData.daily.length === 0 ? (
+                  {selectedMemberData.daily.filter(hasTimelineContent).length === 0 ? (
                     <div className="text-center py-6 text-slate-400 text-xs font-bold border border-dashed border-slate-100 rounded-2xl bg-white shadow-sm">
                       活動タイムラインの記録がありません
                     </div>
                   ) : (
-                    selectedMemberData.daily.map((rec, i) => {
+                    selectedMemberData.daily.filter(hasTimelineContent).map((rec, i) => {
                       const hasMetrics = rec.jog > 0 || rec.mlt > 0 || rec.cv > 0 || rec.speed > 0;
                       const dateText = rec.date ? rec.date.substring(5).replace('-', '/') : '日付不明'; // "05/18"
                       
@@ -2004,7 +2166,7 @@ export default function StatsDashboard({
                             
                             {/* 日付・走行距離のヘッダー */}
                             <div className="flex justify-between items-center text-[10px] font-black text-slate-400 relative z-10">
-                              <span>{dateText} の練習記録</span>
+                              <span>{dateText}</span>
                               <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider shadow-sm">
                                 {sortKey === 'total' ? rec.total : (rec[sortKey] || 0)} km
                                 {sortKey !== 'total' && (
@@ -2029,17 +2191,14 @@ export default function StatsDashboard({
                               </div>
                             )}
 
-                            {/* 練習メニュー、コメント */}
-                            <div className="space-y-1 relative z-10 text-xs">
+                            <TimelineRecordFields rec={rec} focusKey={sortKey} />
+
+                            {/* 練習メニュー */}
+                            <div className="space-y-2 relative z-10 text-xs">
                               {rec.menu && (
                                 <p className="text-slate-700 font-extrabold leading-snug">
-                                  <span className="text-[9px] text-slate-400 font-black mr-1 uppercase">メニュー:</span>
+                                  <span className="text-[9px] text-slate-400 font-black mr-1">メニュー</span>
                                   {rec.menu}
-                                </p>
-                              )}
-                              {rec.comment && (
-                                <p className="text-slate-500 leading-relaxed font-bold bg-slate-50/50 p-2.5 rounded-2xl border border-slate-100/50 mt-1.5 italic">
-                                  &ldquo;{rec.comment}&rdquo;
                                 </p>
                               )}
                             </div>
@@ -2058,7 +2217,7 @@ export default function StatsDashboard({
 
 
       {/* 📱 ランキング詳細表示時用のフローティング戻るボタン */}
-      {showSection === 'ranking' && rankingDetailMember && (
+      {showSection === '__disabled__' && rankingDetailMember && (
         <button
           onClick={() => setRankingDetailMember('')}
           className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white pl-4 pr-4.5 py-3 rounded-full shadow-[0_8px_30px_rgba(15,23,42,0.3)] active:scale-95 transition-all font-black text-xs border border-slate-700/20 active:bg-slate-900 cursor-pointer animate-fade-in"
@@ -2111,7 +2270,7 @@ export default function StatsDashboard({
             >
               <div>
                 <h3 className="text-base font-black text-slate-800">部員を選択</h3>
-                <p className="text-[9px] text-slate-400 font-bold block mt-0.5 uppercase tracking-wider">Tap to change statistics targets</p>
+                <p className="text-[9px] text-slate-400 font-bold block mt-0.5">タップして切り替え</p>
               </div>
               <button 
                 onClick={closeMemberSheet}

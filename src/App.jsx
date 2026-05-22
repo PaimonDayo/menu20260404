@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   MapPin, Clock, ListChecks, Timer, StickyNote,
-  ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Footprints, CalendarDays as CalendarIcon
+  ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Users, Footprints, CalendarDays as CalendarIcon
 } from 'lucide-react';
 import { months, practiceData as mockData, mockScheduleData, locationStyles, defaultLocationStyle, locationDetails } from './data/mockData';
 import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, hasConfig } from './services/sheetsService';
 import CalendarModal from './components/CalendarModal';
 import LocationsModal from './components/LocationsModal';
 import StatsDashboard from './components/StatsDashboard';
+import RecordInputDrawer from './components/RecordInputDrawer';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -310,6 +311,9 @@ export default function App() {
      
      // 📱 新マルチタブ用の状態変数
      const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'ranking' | 'analytics'
+     const [socialResetKey, setSocialResetKey] = useState(0);
+     const [myPageResetKey, setMyPageResetKey] = useState(0);
+     const [showInputDrawer, setShowInputDrawer] = useState(false);
 
      // メンバー状態の永続化
      const [selectedMember, setSelectedMember] = useState(() => {
@@ -339,7 +343,7 @@ export default function App() {
       const ts = isBeginningOfMonth ? Date.now() : null;
 
       for (const m of targetMonths) {
-        if (!sessionCache.current[m] || isBeginningOfMonth) {
+        if (!sessionCache.current[m] || sessionCache.current[m].length === 0 || isBeginningOfMonth) {
           try {
             if (hasConfig()) {
               const d = await fetchPracticeData(m, ts);
@@ -396,7 +400,7 @@ export default function App() {
   const loadData = useCallback(async (month) => {
     if (month === '日程一覧') return;
 
-    if (sessionCache.current[month]) {
+    if (sessionCache.current[month] && sessionCache.current[month].length > 0) {
       setPracticeSessions(sessionCache.current[month]);
       return;
     }
@@ -765,6 +769,7 @@ export default function App() {
             selectedMember={selectedMember}
             setSelectedMember={setSelectedMember}
             setActiveTab={setActiveTab}
+            resetSignal={socialResetKey}
           />
         )}
 
@@ -775,17 +780,35 @@ export default function App() {
             selectedMember={selectedMember}
             setSelectedMember={setSelectedMember}
             setActiveTab={setActiveTab}
+            onOpenInputDrawer={() => setShowInputDrawer(true)}
+            resetSignal={myPageResetKey}
           />
         )}
 
       </main>
+
+      <RecordInputDrawer
+        isOpen={showInputDrawer}
+        onClose={() => setShowInputDrawer(false)}
+        memberName={selectedMember}
+        onRecordSubmitted={() => {
+          localStorage.removeItem('tf_member_stats_cache');
+          window.dispatchEvent(new Event('tf_stats_cache_updated'));
+        }}
+      />
 
       {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}
       <nav className="fixed bottom-4 inset-x-4 z-40 rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] flex justify-around items-center max-w-md mx-auto">
         
         {/* ボタン: 予定 */}
         <button
-          onClick={() => setActiveTab('schedule')}
+          onClick={() => {
+            if (activeTab === 'schedule') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              setActiveTab('schedule');
+            }
+          }}
           className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
             activeTab === 'schedule' 
               ? 'text-blue-600 font-extrabold scale-105' 
@@ -798,20 +821,32 @@ export default function App() {
 
         {/* ボタン: ランキング */}
         <button
-          onClick={() => setActiveTab('ranking')}
+          onClick={() => {
+            if (activeTab === 'ranking') {
+              setSocialResetKey((prev) => prev + 1);
+            } else {
+              setActiveTab('ranking');
+            }
+          }}
           className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
             activeTab === 'ranking' 
-              ? 'text-amber-600 font-extrabold scale-105' 
+              ? 'text-blue-600 font-extrabold scale-105' 
               : 'text-slate-400 active:text-slate-600'
           }`}
         >
-          <Trophy size={18} className={activeTab === 'ranking' ? 'text-amber-600' : ''} />
-          <span className="text-[9px] tracking-wide font-black">ランキング</span>
+          <Users size={18} className={activeTab === 'ranking' ? 'text-blue-600' : ''} />
+          <span className="text-[9px] tracking-wide font-black">ソーシャル</span>
         </button>
 
         {/* ボタン: 個人分析 */}
         <button
-          onClick={() => setActiveTab('analytics')}
+          onClick={() => {
+            if (activeTab === 'analytics') {
+              setMyPageResetKey((prev) => prev + 1);
+            } else {
+              setActiveTab('analytics');
+            }
+          }}
           className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
             activeTab === 'analytics' 
               ? 'text-emerald-600 font-extrabold scale-105' 
@@ -819,7 +854,7 @@ export default function App() {
           }`}
         >
           <User size={18} className={activeTab === 'analytics' ? 'text-emerald-600' : ''} />
-          <span className="text-[9px] tracking-wide font-black">分析</span>
+          <span className="text-[9px] tracking-wide font-black">マイページ</span>
         </button>
 
       </nav>

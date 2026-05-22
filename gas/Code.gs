@@ -1,0 +1,505 @@
+/**
+ * Google Apps Script backend for the TF React app.
+ *
+ * This keeps the older HtmlService/submitData entry points available, while
+ * adding JSON endpoints used by the Vite React frontend:
+ *   GET  ?action=fetchAll
+ *   GET  ?action=fetchPractice&month=5
+ *   GET  ?action=getRecord&memberName=B1...&date=2026-05-23
+ *   POST practice record payload
+ *   POST { action: 'addReply', memberName, date, reply }
+ */
+
+const CACHE_EXPIRATION_SECONDS = 600;
+const SPREADSHEET_ID = '1uAo7E8_rMbUZlml1H0vj119htQeoa2eMWqASUXQTqgg';
+const SHEET_NAME = 'Sheet1';
+
+function getSpreadsheet() {
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
+function doGet(e) {
+  try {
+    const action = e && e.parameter ? e.parameter.action : '';
+
+    if (action === 'fetchAll') {
+      return handleFetchAll(e.parameter.bypassCache === 'true');
+    }
+    if (action === 'fetchPractice') {
+      return handleFetchPractice(e.parameter.month);
+    }
+    if (action === 'getRecord') {
+      return handleGetRecord(e.parameter.memberName, e.parameter.date);
+    }
+    if (action === 'replySupport') {
+      return createJsonResponse({ replySupport: true });
+    }
+
+    return HtmlService.createTemplateFromFile('index')
+      .evaluate()
+      .setTitle('Running Log Form')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  } catch (err) {
+    return createJsonResponse({ error: err.toString() }, 500);
+  }
+}
+
+function doPost(e) {
+  try {
+    const postData = JSON.parse(e.postData.contents);
+    const result = postData.action === 'addReply'
+      ? addPracticeReply(postData)
+      : writePracticeRecord(postData);
+
+    CacheService.getScriptCache().remove('all_member_stats');
+    return createJsonResponse(result);
+  } catch (err) {
+    return createJsonResponse({ error: err.toString() }, 500);
+  }
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function createJsonResponse(data) {
+  const output = ContentService.createTextOutput(JSON.stringify(data));
+  output.setMimeType(ContentService.MimeType.JSON);
+  return output;
+}
+
+function submitData(data) {
+  try {
+    const ss = getSpreadsheet();
+    const sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+    const row = [
+      data.date,
+      data.day,
+      data.targetDist,
+      data.actualDist,
+      data.weeklyTotal,
+      data.result,
+      data.jog,
+      data.jogTotal,
+      data.mlt,
+      data.mltTotal,
+      data.cvvo2,
+      data.cvvo2Total,
+      data.speed,
+      data.speedTotal,
+      data.strides,
+      data.otherEx,
+      data.weights,
+      data.comment,
+      data.condition,
+      data.sleep
+    ];
+    sheet.appendRow(row);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.toString() };
+  }
+}
+
+function findHeaderIndex(values) {
+  for (let i = 0; i < Math.min(15, values.length); i++) {
+    if (values[i].some(cell => cell.toString().indexOf('低強度') !== -1)) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+function getColumns(header) {
+  const columns = {
+    dateCol: 0,
+    jogCol: header.findIndex(cell => cell.toString().indexOf('低強度') !== -1),
+    mltCol: header.findIndex(cell => cell.toString().indexOf('中強度') !== -1),
+    cvCol: header.findIndex(cell => cell.toString().indexOf('高強度') !== -1),
+    speedCol: header.findIndex(cell => cell.toString().indexOf('解糖系') !== -1),
+    stridesCol: header.findIndex(cell => cell.toString().indexOf('流し') !== -1),
+    reinforceCol: header.findIndex(cell => cell.toString().indexOf('補強') !== -1),
+    commentCol: header.findIndex(cell => cell.toString().indexOf('感想') !== -1),
+    resultCol: header.findIndex(cell => cell.toString().indexOf('結果') !== -1)
+  };
+  columns.totalCol = header.findIndex(cell => cell.toString().indexOf('実際の距離') !== -1);
+  if (columns.totalCol === -1) {
+    columns.totalCol = header.findIndex(cell => cell.toString().trim() === '距離');
+  }
+  return columns;
+}
+
+function findRecordRow(values, headerIdx, date) {
+  for (let i = headerIdx + 1; i < values.length; i++) {
+    const raw = values[i][0];
+    if (!raw) continue;
+    if (parseSheetDate(raw) === date) return i;
+  }
+  return -1;
+}
+
+function handleFetchAll(bypassCache) {
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'all_member_stats';
+
+  if (!bypassCache) {
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return createJsonResponse({ source: 'cache', data: JSON.parse(cachedData) });
+    }
+  }
+
+  const allData = [];
+  const sheets = getSpreadsheet().getSheets();
+  for (const sheet of sheets) {
+    const name = sheet.getName();
+    if (/^[BM]\d/.test(name)) {
+      const records = parseMemberSheet(sheet);
+      if (records !== null) {
+        allData.push({
+          name,
+          gid: sheet.getSheetId().toString(),
+          records
+        });
+      }
+    }
+  }
+
+  const sortedData = allData.sort((a, b) => a.name.localeCompare(b.name));
+  try {
+    cache.put(cacheKey, JSON.stringify(sortedData), CACHE_EXPIRATION_SECONDS);
+  } catch (err) {
+    Logger.log('キャッシュ保存失敗: ' + err.toString());
+  }
+
+  return createJsonResponse({ source: 'sheets', data: sortedData });
+}
+
+function handleFetchPractice(month) {
+  if (!month) {
+    return createJsonResponse({ error: 'month is required' });
+  }
+
+  const rawMonthLabel = month.toString().trim().replace(/メニュー$/, '');
+  const monthLabel = rawMonthLabel.endsWith('月') ? rawMonthLabel : rawMonthLabel + '月';
+  const sheet = getSpreadsheet().getSheetByName(monthLabel + 'メニュー');
+  if (!sheet) {
+    return createJsonResponse({ data: [] });
+  }
+
+  const values = sheet.getDataRange().getDisplayValues();
+  const dataStart = values.findIndex(row => /^\d{1,4}\/\d{1,2}/.test((row[0] || '').toString().trim()));
+  const dataRows = dataStart >= 0 ? values.slice(dataStart) : values.slice(4);
+
+  const records = dataRows
+    .filter(row => {
+      const dateVal = (row[0] || '').toString().trim();
+      const location = (row[3] || '').toString().trim();
+      const menu = (row[4] || '').toString().trim();
+      return dateVal && (location || menu);
+    })
+    .map((row, i) => ({
+      id: i + 1,
+      date: parseSheetDate(row[0] || ''),
+      dayOfWeek: (row[1] || '').toString().trim(),
+      time: formatTime(row[2] || ''),
+      location: (row[3] || '').toString().trim(),
+      weather: '',
+      menu: (row[4] || '').toString().replace(/\\n/g, '\n'),
+      pace: (row[5] || '').toString().replace(/\\n/g, '\n'),
+      notes: (row[6] || '').toString().replace(/\\n/g, '\n')
+    }));
+
+  return createJsonResponse({ data: records });
+}
+
+function handleGetRecord(memberName, date) {
+  if (!memberName || !date) {
+    return createJsonResponse({ exists: false, error: 'memberName と date は必須です。' });
+  }
+
+  const sheet = getSpreadsheet().getSheetByName(memberName);
+  if (!sheet) {
+    return createJsonResponse({ exists: false });
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const headerIdx = findHeaderIndex(values);
+  if (headerIdx === -1) {
+    return createJsonResponse({ exists: false });
+  }
+
+  const columns = getColumns(values[headerIdx]);
+  const targetRowIdx = findRecordRow(values, headerIdx, date);
+  if (targetRowIdx === -1) {
+    return createJsonResponse({ exists: false });
+  }
+
+  const row = values[targetRowIdx];
+  const parseNum = (val) => {
+    if (val === undefined || val === null || val === '') return 0;
+    const num = parseFloat(val);
+    return isNaN(num) ? 0 : num;
+  };
+
+  return createJsonResponse({
+    exists: true,
+    data: {
+      jog: columns.jogCol !== -1 ? parseNum(row[columns.jogCol]) : 0,
+      mlt: columns.mltCol !== -1 ? parseNum(row[columns.mltCol]) : 0,
+      cv: columns.cvCol !== -1 ? parseNum(row[columns.cvCol]) : 0,
+      speed: columns.speedCol !== -1 ? parseNum(row[columns.speedCol]) : 0,
+      strides: columns.stridesCol !== -1 ? parseNum(row[columns.stridesCol]) : 0,
+      reinforce: columns.reinforceCol !== -1 ? row[columns.reinforceCol].toString().trim() : '',
+      comment: columns.commentCol !== -1 ? row[columns.commentCol].toString().trim() : '',
+      result: columns.resultCol !== -1 ? row[columns.resultCol].toString().trim() : ''
+    }
+  });
+}
+
+function parseMemberSheet(sheet) {
+  const values = sheet.getDataRange().getDisplayValues();
+  if (values.length < 15) return null;
+
+  const headerIdx = findHeaderIndex(values);
+  if (headerIdx === -1) return null;
+
+  const header = values[headerIdx];
+  const columns = getColumns(header);
+  const records = [];
+
+  for (const row of values.slice(headerIdx + 1)) {
+    const dateRaw = row[0] ? row[0].toString().trim() : '';
+    if (!dateRaw || !/^\d{1,2}\/\d{1,2}/.test(dateRaw)) continue;
+
+    const jog = columns.jogCol !== -1 ? parseDistance(row[columns.jogCol]) : 0;
+    const mlt = columns.mltCol !== -1 ? parseDistance(row[columns.mltCol]) : 0;
+    const cv = columns.cvCol !== -1 ? parseDistance(row[columns.cvCol]) : 0;
+    const speed = columns.speedCol !== -1 ? parseDistance(row[columns.speedCol]) : 0;
+    const actual = columns.totalCol !== -1 ? parseDistance(row[columns.totalCol]) : 0;
+    const strides = columns.stridesCol !== -1 ? parseDistance(row[columns.stridesCol]) : 0;
+    const reinforce = columns.reinforceCol !== -1 ? row[columns.reinforceCol].toString().trim() : '';
+    const comment = columns.commentCol !== -1 ? row[columns.commentCol].toString().trim() : '';
+    const result = columns.resultCol !== -1 ? row[columns.resultCol].toString().trim() : '';
+    const replies = readPracticeReplies(row, header);
+
+    const sum = jog + mlt + cv + speed;
+    const total = sum > 0 ? Math.max(sum, actual) : actual;
+
+    if (total > 0 || jog > 0 || mlt > 0 || cv > 0 || speed > 0 || strides > 0 || reinforce || comment || result || replies.length > 0) {
+      records.push({
+        date: parseSheetDate(dateRaw),
+        total: round2(total),
+        jog: round2(jog),
+        mlt: round2(mlt),
+        cv: round2(cv),
+        speed: round2(speed),
+        strides: round2(strides),
+        reinforce,
+        comment,
+        result,
+        replies
+      });
+    }
+  }
+
+  return records;
+}
+
+function writePracticeRecord(data) {
+  const { memberName, date, jog, mlt, cv, speed, strides, reinforce, comment, result, total, isDelete } = data;
+  if (!memberName || !date) {
+    throw new Error('メンバー名と日付は必須です。');
+  }
+
+  const sheet = getSpreadsheet().getSheetByName(memberName);
+  if (!sheet) {
+    throw new Error('シート「' + memberName + '」が見つかりません。');
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const headerIdx = findHeaderIndex(values);
+  if (headerIdx === -1) {
+    throw new Error('シートのデータ形式（低強度列）が見つかりません。');
+  }
+
+  const columns = getColumns(values[headerIdx]);
+  let rowToUpdate = findRecordRow(values, headerIdx, date);
+  const formatCellVal = (val) => (val !== undefined && val !== null && val !== '') ? parseFloat(val) : '';
+
+  if (isDelete) {
+    if (rowToUpdate === -1) return { success: true, action: 'not_found' };
+    rowToUpdate += 1;
+    [
+      columns.jogCol,
+      columns.mltCol,
+      columns.cvCol,
+      columns.speedCol,
+      columns.stridesCol,
+      columns.reinforceCol,
+      columns.commentCol,
+      columns.resultCol
+    ].filter(col => col !== -1).forEach(col => {
+      sheet.getRange(rowToUpdate, col + 1).setValue('');
+    });
+    return { success: true, action: 'deleted', row: rowToUpdate };
+  }
+
+  if (rowToUpdate === -1) {
+    rowToUpdate = sheet.getLastRow();
+    sheet.insertRowAfter(rowToUpdate);
+    rowToUpdate += 1;
+    const targetDate = new Date(date);
+    sheet.getRange(rowToUpdate, 1).setValue((targetDate.getMonth() + 1) + '/' + targetDate.getDate());
+    sheet.getRange(rowToUpdate, 2).setValue(['日', '月', '火', '水', '木', '金', '土'][targetDate.getDay()]);
+  } else {
+    rowToUpdate += 1;
+  }
+
+  if (columns.jogCol !== -1) sheet.getRange(rowToUpdate, columns.jogCol + 1).setValue(formatCellVal(jog));
+  if (columns.mltCol !== -1) sheet.getRange(rowToUpdate, columns.mltCol + 1).setValue(formatCellVal(mlt));
+  if (columns.cvCol !== -1) sheet.getRange(rowToUpdate, columns.cvCol + 1).setValue(formatCellVal(cv));
+  if (columns.speedCol !== -1) sheet.getRange(rowToUpdate, columns.speedCol + 1).setValue(formatCellVal(speed));
+  if (columns.stridesCol !== -1) sheet.getRange(rowToUpdate, columns.stridesCol + 1).setValue(formatCellVal(strides));
+  if (columns.reinforceCol !== -1) sheet.getRange(rowToUpdate, columns.reinforceCol + 1).setValue(reinforce || '');
+  if (columns.commentCol !== -1) sheet.getRange(rowToUpdate, columns.commentCol + 1).setValue(comment || '');
+  if (columns.resultCol !== -1) sheet.getRange(rowToUpdate, columns.resultCol + 1).setValue(result || '');
+
+  if (columns.totalCol !== -1 && total !== undefined && total !== null && total !== '') {
+    const cell = sheet.getRange(rowToUpdate, columns.totalCol + 1);
+    if (!cell.getFormula()) {
+      cell.setValue(parseFloat(total));
+    }
+  }
+
+  return { success: true, action: 'updated', row: rowToUpdate };
+}
+
+function addPracticeReply(data) {
+  const { memberName, date, reply } = data;
+  if (!memberName || !date || !reply || !reply.toString().trim()) {
+    throw new Error('メンバー名、日付、リプライは必須です。');
+  }
+
+  const sheet = getSpreadsheet().getSheetByName(memberName);
+  if (!sheet) {
+    throw new Error('シート「' + memberName + '」が見つかりません。');
+  }
+
+  const values = sheet.getDataRange().getValues();
+  const headerIdx = findHeaderIndex(values);
+  if (headerIdx === -1) {
+    throw new Error('シートのデータ形式（低強度列）が見つかりません。');
+  }
+
+  const rowIdx = findRecordRow(values, headerIdx, date);
+  if (rowIdx === -1) {
+    throw new Error('対象日の記録が見つかりません。先に練習記録を作成してください。');
+  }
+
+  const header = values[headerIdx];
+  const targetRow = values[rowIdx];
+  const targetCol = findNextReplyColumn(sheet, targetRow, header);
+  sheet.getRange(rowIdx + 1, targetCol + 1).setValue(reply.toString().trim());
+
+  return { success: true, action: 'replied', row: rowIdx + 1, col: targetCol + 1 };
+}
+
+function readPracticeReplies(row, header) {
+  const replies = [];
+  let lastStructuralCol = -1;
+
+  for (let col = header.length - 1; col >= 0; col--) {
+    if ((header[col] || '').toString().trim() !== '') {
+      lastStructuralCol = col;
+      break;
+    }
+  }
+
+  for (let col = lastStructuralCol + 1; col < row.length; col++) {
+    const text = row[col] ? row[col].toString().trim() : '';
+    if (text) replies.push(text);
+  }
+
+  return replies;
+}
+
+function findNextReplyColumn(sheet, row, header) {
+  let lastStructuralCol = -1;
+
+  for (let col = header.length - 1; col >= 0; col--) {
+    if ((header[col] || '').toString().trim() !== '') {
+      lastStructuralCol = col;
+      break;
+    }
+  }
+
+  let rightmostReplyCol = lastStructuralCol;
+  for (let col = lastStructuralCol + 1; col < row.length; col++) {
+    if ((row[col] || '').toString().trim() !== '') {
+      rightmostReplyCol = col;
+    }
+  }
+
+  const nextCol = rightmostReplyCol + 1;
+  if (nextCol >= sheet.getMaxColumns()) {
+    sheet.insertColumnAfter(sheet.getMaxColumns());
+  }
+  return nextCol;
+}
+
+function parseDistance(val) {
+  if (!val) return 0;
+
+  let cleanVal = val.toString().trim().replace(/[０-９．＋，、（）]/g, (s) => {
+    if (s === '．') return '.';
+    if (s === '＋') return '+';
+    if (s === '，' || s === '、') return ',';
+    if (s === '（') return '(';
+    if (s === '）') return ')';
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+
+  while (cleanVal.indexOf('(') !== -1) {
+    const start = cleanVal.indexOf('(');
+    const end = cleanVal.indexOf(')', start);
+    cleanVal = end !== -1
+      ? cleanVal.substring(0, start) + cleanVal.substring(end + 1)
+      : cleanVal.substring(0, start);
+  }
+
+  return cleanVal.split(/[+,]/).reduce((sum, part) => {
+    const num = parseFloat(part.trim().replace(/[^\d.]/g, ''));
+    return sum + (isNaN(num) ? 0 : num);
+  }, 0);
+}
+
+function formatTime(raw) {
+  if (!raw) return '';
+  return raw.toString().trim().replace(/^(\d{1,2}:\d{2}):\d{2}$/, '$1');
+}
+
+function round2(num) {
+  return Math.round(num * 100) / 100;
+}
+
+function parseSheetDate(raw) {
+  if (Object.prototype.toString.call(raw) === '[object Date]' && !isNaN(raw)) {
+    return Utilities.formatDate(raw, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+
+  const s = raw.toString().trim().split(' ')[0];
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const parts = s.split('/').map(p => p.trim());
+  const year = new Date().getFullYear();
+  if (parts.length === 2) {
+    return year + '-' + parts[0].padStart(2, '0') + '-' + parts[1].padStart(2, '0');
+  }
+  if (parts.length === 3) {
+    return parts[0] + '-' + parts[1].padStart(2, '0') + '-' + parts[2].padStart(2, '0');
+  }
+  return s;
+}

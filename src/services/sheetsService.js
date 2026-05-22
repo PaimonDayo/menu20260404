@@ -17,9 +17,87 @@
  * G: 補足（複数行）
  */
 
-import { SPREADSHEET_ID, SHEET_GIDS } from '../config';
+import { SPREADSHEET_ID, GAS_API_URL } from '../config';
 
 const BASE_URL = 'https://docs.google.com/spreadsheets/d';
+
+let sheetMetaCache = null;
+
+async function fetchSheetMetaList() {
+  if (sheetMetaCache) return sheetMetaCache;
+
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/htmlview`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`シート一覧の取得に失敗しました (${res.status})`);
+  }
+
+  const html = await res.text();
+  if (html.trimStart().startsWith('<!DOCTYPE') && html.includes('エラー')) {
+    throw new Error('シート一覧の取得に失敗しました。共有設定を確認してください。');
+  }
+
+  const regex = /items\.push\(\s*({[^}]+})\s*\)/g;
+  const sheets = [];
+  let match;
+  while ((match = regex.exec(html)) !== null) {
+    const objText = match[1];
+    const nameMatch = /name:\s*"([^"]+)"/.exec(objText);
+    const gidMatch = /gid:\s*"([^"]+)"/.exec(objText);
+    if (nameMatch && gidMatch) {
+      sheets.push({ name: nameMatch[1], gid: gidMatch[1] });
+    }
+  }
+
+  sheetMetaCache = sheets;
+  return sheets;
+}
+
+async function findSheetGidByName(sheetName) {
+  const sheets = await fetchSheetMetaList();
+  const exact = sheets.find(sheet => sheet.name === sheetName);
+  return exact ? exact.gid : null;
+}
+
+async function fetchCsvByGid(gid, timestamp) {
+  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
+  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&gid=${gid}${cacheBuster}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`スプレッドシートの取得に失敗しました (${res.status})`);
+  }
+
+  const contentType = res.headers.get('content-type') ?? '';
+  const text = await res.text();
+  if (contentType.includes('text/html') || text.trimStart().startsWith('<!DOCTYPE')) {
+    throw new Error('スプレッドシートのCSV取得に失敗しました。共有設定を確認してください。');
+  }
+  return text;
+}
+
+async function readJsonResponse(response, actionLabel) {
+  const contentType = response.headers.get('content-type') ?? '';
+  const text = await response.text();
+
+  if (contentType.includes('text/html') || text.trimStart().startsWith('<!DOCTYPE')) {
+    const extracted = text
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const message = extracted.includes('アクセスする権限がありません')
+      ? 'GAS Web App にアクセス権限がありません。デプロイURLまたは公開設定を確認してください。'
+      : 'GAS Web App がJSONではなくHTMLを返しています。デプロイ状態を確認してください。';
+    throw new Error(`${actionLabel}: ${message}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`${actionLabel}: GAS Web App のレスポンスをJSONとして解析できません。`);
+  }
+}
 
 // ── CSV パーサー ──────────────────────────────────────────────────────────────
 
@@ -181,32 +259,28 @@ export async function fetchPracticeData(month, timestamp) {
     throw new Error('config.js にスプレッドシートIDが設定されていません。');
   }
 
-  const gid = SHEET_GIDS[month];
-  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
-  let url;
-  if (gid != null) {
-    // GIDが分かっている場合: 型推論なしの生CSVエクスポート
-    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&gid=${gid}${cacheBuster}`;
-  } else {
-    // GID不明の場合: シート名フォールバック（gviz は使わない）
-    const sheetName = encodeURIComponent(`${month}メニュー`);
-    url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}${cacheBuster}`;
+  if (GAS_API_URL && GAS_API_URL.trim() !== '') {
+    try {
+      const gasUrl = `${GAS_API_URL}?action=fetchPractice&month=${encodeURIComponent(month)}${timestamp ? `&t=${timestamp}` : ''}`;
+      const gasRes = await fetch(gasUrl);
+      if (gasRes.ok) {
+        const json = await gasRes.json();
+        if (Array.isArray(json?.data)) return json.data;
+      }
+    } catch (err) {
+      console.warn('GAS経由の練習メニュー取得に失敗しました。CSV取得へフォールバックします。', err);
+    }
   }
 
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(
-      `スプレッドシートの取得に失敗しました (${res.status})。` +
-      `共有設定を「リンクを知っている全員が閲覧可能」にしてください。`
-    );
+  const rawMonthLabel = String(month).trim().replace(/メニュー$/, '');
+  const monthLabel = rawMonthLabel.endsWith('月') ? rawMonthLabel : `${rawMonthLabel}月`;
+  const targetSheetName = `${monthLabel}メニュー`;
+  const gid = await findSheetGidByName(targetSheetName);
+  if (!gid) {
+    throw new Error(`${targetSheetName} シートが見つかりません。`);
   }
 
-  // レスポンスがHTMLの場合（リダイレクト・ログインページ）はエラーとする
-  const contentType = res.headers.get('content-type') ?? '';
-  const text = await res.text();
-  if (contentType.includes('text/html') || text.trimStart().startsWith('<!DOCTYPE')) {
-    throw new Error('スプレッドシートのCSV取得に失敗しました（共有設定を確認してください）。');
-  }
+  const text = await fetchCsvByGid(gid, timestamp);
 
   const allRows = parseCsv(text);
 
@@ -252,20 +326,11 @@ export async function fetchScheduleData(timestamp) {
     return [];
   }
 
-  // GID不明の場合はシート名フォールバック
-  const sheetName = encodeURIComponent('日程一覧');
-  const cacheBuster = timestamp ? `&t=${timestamp}` : '';
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/export?format=csv&sheet=${sheetName}${cacheBuster}`;
-
   try {
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    
-    const contentType = res.headers.get('content-type') ?? '';
-    const text = await res.text();
-    if (contentType.includes('text/html') || text.trimStart().startsWith('<!DOCTYPE')) {
-      return [];
-    }
+    const gid = await findSheetGidByName('日程一覧');
+    if (!gid) return [];
+
+    const text = await fetchCsvByGid(gid, timestamp);
 
     const allRows = parseCsv(text);
     // 3行目（インデックス2）からデータ開始
@@ -347,36 +412,8 @@ export async function fetchSheetList() {
   if (!SPREADSHEET_ID || SPREADSHEET_ID === 'ここにスプレッドシートIDを入力') {
     return [];
   }
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/htmlview`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`シート一覧の取得に失敗しました (${res.status})`);
-  }
-  const html = await res.text();
-
-  // htmlview 内の JavaScript にあるシート情報を抽出
-  // 例: items.push({name: "B2山田", pageUrl: "...", gid: "755630045", ...})
-  const regex = /items\.push\(\s*({[^}]+})\s*\)/g;
-  const sheets = [];
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    try {
-      const objText = match[1];
-      const nameMatch = /name:\s*"([^"]+)"/.exec(objText);
-      const gidMatch = /gid:\s*"([^"]+)"/.exec(objText);
-      if (nameMatch && gidMatch) {
-        const name = nameMatch[1];
-        const gid = gidMatch[1];
-        // 各学年（B1〜B4, M1, M2等）で始まるシート名（部員名）を抽出
-        if (/^[BM]\d/.test(name)) {
-          sheets.push({ name, gid });
-        }
-      }
-    } catch (e) {
-      console.warn('シート情報の抽出に失敗:', e);
-    }
-  }
-  return sheets;
+  const sheets = await fetchSheetMetaList();
+  return sheets.filter(sheet => /^[BM]\d/.test(sheet.name));
 }
 
 /**
@@ -414,6 +451,31 @@ export async function fetchMemberPracticeData(gid, timestamp) {
   if (totalCol === -1) {
     totalCol = header.findIndex(cell => cell.trim() === '距離');
   }
+  const stridesCol   = header.findIndex(cell => cell.includes('流し'));
+  const reinforceCol = header.findIndex(cell => cell.includes('補強'));
+  const resultCol    = header.findIndex(cell => cell.includes('結果') || cell.includes('ペース'));
+  let commentCol = header.findIndex(cell => cell.includes('感想') || cell.includes('コメント'));
+  if (commentCol === -1) {
+    commentCol = 17;
+  }
+
+  const getReplies = (row) => {
+    let lastStructuralCol = -1;
+    for (let col = header.length - 1; col >= 0; col--) {
+      if ((header[col] ?? '').trim() !== '') {
+        lastStructuralCol = col;
+        break;
+      }
+    }
+    if (lastStructuralCol === -1) lastStructuralCol = commentCol;
+
+    const replies = [];
+    for (let col = lastStructuralCol + 1; col < Math.max(header.length, row.length); col++) {
+      const text = row[col]?.trim() ?? '';
+      if (text) replies.push(text);
+    }
+    return replies;
+  };
 
   const dataRows = rows.slice(headerIdx + 1);
   const records = [];
@@ -492,10 +554,13 @@ export async function fetchMemberPracticeData(gid, timestamp) {
       total = actual;
     }
 
-    // 感想など (いただいたスプレッドシートの18列目 = index 17)
-    const comment = row.length > 17 ? (row[17]?.trim() ?? '') : '';
+    const strides = stridesCol !== -1 ? parseVal(row[stridesCol]) : 0;
+    const reinforce = reinforceCol !== -1 ? (row[reinforceCol]?.trim() ?? '') : '';
+    const result = resultCol !== -1 ? (row[resultCol]?.trim() ?? '') : '';
+    const comment = commentCol !== -1 ? (row[commentCol]?.trim() ?? '') : '';
+    const replies = getReplies(row);
 
-    if (total > 0 || jog > 0 || mlt > 0 || cv > 0 || speed > 0) {
+    if (total > 0 || jog > 0 || mlt > 0 || cv > 0 || speed > 0 || strides > 0 || reinforce || result || comment || replies.length > 0) {
       records.push({
         date: dateStr,
         total: Math.round(total * 100) / 100,
@@ -503,10 +568,106 @@ export async function fetchMemberPracticeData(gid, timestamp) {
         mlt: Math.round(mlt * 100) / 100,
         cv: Math.round(cv * 100) / 100,
         speed: Math.round(speed * 100) / 100,
-        comment
+        strides,
+        reinforce,
+        result,
+        comment,
+        replies
       });
     }
   }
 
   return records;
+}
+
+export async function fetchAllMembersStats(bypassCache = false) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    return null;
+  }
+
+  const cacheBuster = bypassCache ? '&bypassCache=true' : '';
+  const url = `${GAS_API_URL}?action=fetchAll${cacheBuster}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`GASデータの取得に失敗しました (${res.status})`);
+  }
+  const contentType = res.headers.get('content-type') ?? '';
+  if (contentType.includes('text/html')) {
+    throw new Error('GAS Web App がJSONではなくHTMLを返しています。公開設定またはデプロイURLを確認してください。');
+  }
+  const json = await readJsonResponse(res, 'GASデータ取得');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return Array.isArray(json?.data) ? json.data : null;
+}
+
+export async function fetchMemberDayRecord(memberName, date) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    return null;
+  }
+
+  const url = `${GAS_API_URL}?action=getRecord&memberName=${encodeURIComponent(memberName)}&date=${encodeURIComponent(date)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`既存データの取得に失敗しました (${res.status})`);
+  }
+  return await readJsonResponse(res, '既存記録取得');
+}
+
+export async function submitPracticeRecord(data) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    throw new Error('config.js に GAS_API_URL が設定されていません。');
+  }
+
+  const response = await fetch(GAS_API_URL, {
+    method: 'POST',
+    mode: 'cors',
+    redirect: 'follow',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    throw new Error(`記録の送信に失敗しました (${response.status})`);
+  }
+
+  const json = await readJsonResponse(response, '記録送信');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return json;
+}
+
+export async function submitRecordReply({ memberName, date, reply }) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    throw new Error('config.js に GAS_API_URL が設定されていません。');
+  }
+
+  const response = await fetch(GAS_API_URL, {
+    method: 'POST',
+    mode: 'cors',
+    redirect: 'follow',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify({
+      action: 'addReply',
+      memberName,
+      date,
+      reply,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`リプライの送信に失敗しました (${response.status})`);
+  }
+
+  const json = await readJsonResponse(response, 'リプライ送信');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return json;
 }
