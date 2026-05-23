@@ -47,6 +47,24 @@ const dateParts = (dateStr) => {
 
 const asNumberOrBlank = (value) => value === '' ? '' : parseFloat(value);
 
+const mergeRecordResponse = (cached, remote) => {
+  if (cached?.exists && cached.data && (!remote?.exists || !remote.data)) {
+    return cached;
+  }
+  if (!cached?.exists || !cached.data || !remote?.exists || !remote.data) {
+    return remote || cached || { exists: false };
+  }
+
+  const data = { ...remote.data };
+  ['result', 'reinforce', 'comment'].forEach((key) => {
+    if ((data[key] === undefined || data[key] === null || data[key] === '') && cached.data[key]) {
+      data[key] = cached.data[key];
+    }
+  });
+
+  return { ...remote, data };
+};
+
 export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecordSubmitted }) {
   const [date, setDate] = useState(getTodayIso);
   const [result, setResult] = useState('');
@@ -137,7 +155,11 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
     fetchAndCache(memberName, date)
       .then((res) => {
-        if (mounted) applyRecord(res);
+        if (mounted) {
+          const merged = mergeRecordResponse(cached, res);
+          setRecordCache((prev) => ({ ...prev, [key]: merged }));
+          applyRecord(merged);
+        }
       })
       .catch((err) => {
         console.warn('既存記録の取得に失敗しました', err);
@@ -188,7 +210,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
       await submitPracticeRecord(payload);
       setRecordCache((prev) => ({ ...prev, [cacheKeyFor(memberName, date)]: { exists: true, data: payload } }));
-      onRecordSubmitted?.();
+      onRecordSubmitted?.(payload);
       onClose();
     } catch (err) {
       window.alert(`保存に失敗しました: ${err.message}`);
@@ -206,7 +228,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       await submitPracticeRecord({ memberName, date, isDelete: true });
       clearForm();
       setRecordCache((prev) => ({ ...prev, [cacheKeyFor(memberName, date)]: { exists: false } }));
-      onRecordSubmitted?.();
+      onRecordSubmitted?.({ memberName, date, isDelete: true });
       onClose();
     } catch (err) {
       window.alert(`削除に失敗しました: ${err.message}`);
@@ -336,22 +358,25 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
             <div className="flex gap-2 pt-2">
               {recordExists && (
-                <button type="button" onClick={handleDelete} disabled={submitting} className="px-4 bg-[#ffe5e5] text-[#ff3b30] rounded-2xl flex items-center justify-center gap-1.5 text-xs font-extrabold border border-[#ff3b30]/10 active:opacity-75">
+                <button type="button" onClick={handleDelete} disabled={submitting} className="h-12 px-4 bg-[#ffe5e5] text-[#ff3b30] rounded-2xl flex items-center justify-center gap-1.5 text-xs font-extrabold border border-[#ff3b30]/10 active:opacity-75 shrink-0">
                   <Trash2 size={14} />
                   <span>削除</span>
                 </button>
               )}
 
-              <button type="submit" disabled={submitting} className="flex-1 py-3.5 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)]">
+              <button type="submit" disabled={submitting} className="h-12 min-w-0 flex-1 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)] overflow-hidden">
                 {submitting ? (
                   <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>送信中...</span>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span className="whitespace-nowrap">送信中</span>
                   </>
                 ) : (
                   <>
-                    <Send size={12} />
-                    <span>{recordExists ? '練習記録を更新する' : '練習記録を書き込む'}</span>
+                    <Send size={12} className="shrink-0" />
+                    <span className="whitespace-nowrap truncate">
+                      <span className="sm:hidden">{recordExists ? '更新' : '保存'}</span>
+                      <span className="hidden sm:inline">{recordExists ? '練習記録を更新する' : '練習記録を書き込む'}</span>
+                    </span>
                   </>
                 )}
               </button>

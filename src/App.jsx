@@ -542,6 +542,82 @@ export default function App() {
     }, 200);
   }
 
+  const handleRecordSubmitted = useCallback((payload) => {
+    const CACHE_KEY = 'tf_member_stats_cache';
+    const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
+
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached || !payload?.memberName || !payload?.date) return;
+
+      const members = JSON.parse(cached);
+      if (!Array.isArray(members)) return;
+
+      const toNum = (value) => {
+        const num = parseFloat(value);
+        return Number.isFinite(num) ? Math.round(num * 100) / 100 : 0;
+      };
+
+      const nextMembers = members.map(member => {
+        if (member.name !== payload.memberName) return member;
+
+        const records = Array.isArray(member.records) ? [...member.records] : [];
+        const existingIndex = records.findIndex(record => record.date === payload.date);
+
+        if (payload.isDelete) {
+          return {
+            ...member,
+            records: records.filter(record => record.date !== payload.date),
+          };
+        }
+
+        const existing = existingIndex >= 0 ? records[existingIndex] : {};
+        const jog = toNum(payload.jog);
+        const mlt = toNum(payload.mlt);
+        const cv = toNum(payload.cv);
+        const speed = toNum(payload.speed);
+        const total = payload.total !== undefined && payload.total !== ''
+          ? toNum(payload.total)
+          : Math.round((jog + mlt + cv + speed) * 100) / 100;
+
+        const nextRecord = {
+          ...existing,
+          date: payload.date,
+          total,
+          jog,
+          mlt,
+          cv,
+          speed,
+          strides: toNum(payload.strides),
+          reinforce: payload.reinforce || '',
+          result: payload.result || '',
+          comment: payload.comment || '',
+          replies: existing.replies || [],
+        };
+
+        if (existingIndex >= 0) {
+          records[existingIndex] = nextRecord;
+        } else {
+          records.push(nextRecord);
+        }
+
+        records.sort((a, b) => a.date.localeCompare(b.date));
+        return { ...member, records };
+      });
+
+      localStorage.setItem(CACHE_KEY, JSON.stringify(nextMembers));
+      localStorage.setItem(CACHE_TS_KEY, new Date().toLocaleString('ja-JP', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }));
+      window.dispatchEvent(new CustomEvent('tf_stats_cache_updated', { detail: { members: nextMembers } }));
+    } catch (err) {
+      console.warn('記録保存後のローカル反映に失敗しました:', err);
+    }
+  }, []);
+
   // スマホ上部に並ぶ月選択チップスのリスト (日程一覧＋練習メニュー対象月)
   const visibleMonthChips = (() => {
     const todayMonth = new Date().getMonth() + 1;
@@ -791,10 +867,7 @@ export default function App() {
         isOpen={showInputDrawer}
         onClose={() => setShowInputDrawer(false)}
         memberName={selectedMember}
-        onRecordSubmitted={() => {
-          localStorage.removeItem('tf_member_stats_cache');
-          window.dispatchEvent(new Event('tf_stats_cache_updated'));
-        }}
+        onRecordSubmitted={handleRecordSubmitted}
       />
 
       {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}

@@ -523,7 +523,8 @@ export default function StatsDashboard({
 
     // バックグラウンドでの自動ロード連携リスナー
     const handleCacheUpdated = (e) => {
-      const { members: newMembers } = e.detail;
+      const { members: newMembers } = e.detail || {};
+      if (!Array.isArray(newMembers)) return;
       setMembers(newMembers);
       setLoading(false);
       setError(null);
