@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tf-cache-v3';
+const CACHE_NAME = 'tf-cache-v4';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -9,33 +9,27 @@ const urlsToCache = [
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
+    caches.keys()
+      .then(cacheNames => Promise.all(
         cacheNames.map(cacheName => {
           if (cacheName !== CACHE_NAME) {
             return caches.delete(cacheName);
           }
+          return null;
         })
-      );
-    }).then(() => self.clients.claim())
+      ))
+      .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
-  // 基本的にはネットワークを取りに行き、失敗したらキャッシュを返す (Network First)
-  // スプレッドシートの取得なども含むため、常にオンラインからは最新をつかむようにする
   event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request).catch(() => caches.match(event.request))
   );
 });

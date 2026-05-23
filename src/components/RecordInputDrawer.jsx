@@ -252,7 +252,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
           <div className="flex justify-between items-start mb-5">
             <div className="min-w-0 pr-4">
               <h3 className="text-base font-extrabold text-slate-900 truncate">{memberName} の練習記録</h3>
-              <span className="text-[10px] text-slate-400 font-bold block mt-1">スプレッドシートへ保存します</span>
             </div>
             <button
               onClick={onClose}
@@ -358,9 +357,8 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
             <div className="flex gap-2 pt-2">
               {recordExists && (
-                <button type="button" onClick={handleDelete} disabled={submitting} className="h-12 px-4 bg-[#ffe5e5] text-[#ff3b30] rounded-2xl flex items-center justify-center gap-1.5 text-xs font-extrabold border border-[#ff3b30]/10 active:opacity-75 shrink-0">
+                <button type="button" onClick={handleDelete} disabled={submitting} aria-label="削除" title="削除" className="h-12 w-12 bg-[#ffe5e5] text-[#ff3b30] rounded-2xl flex items-center justify-center text-xs font-extrabold border border-[#ff3b30]/10 active:opacity-75 shrink-0">
                   <Trash2 size={14} />
-                  <span>削除</span>
                 </button>
               )}
 
@@ -373,10 +371,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                 ) : (
                   <>
                     <Send size={12} className="shrink-0" />
-                    <span className="whitespace-nowrap truncate">
-                      <span className="sm:hidden">{recordExists ? '更新' : '保存'}</span>
-                      <span className="hidden sm:inline">{recordExists ? '練習記録を更新する' : '練習記録を書き込む'}</span>
-                    </span>
+                    <span className="whitespace-nowrap">{recordExists ? '更新' : '保存'}</span>
                   </>
                 )}
               </button>

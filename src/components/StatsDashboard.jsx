@@ -203,6 +203,7 @@ export default function StatsDashboard({
   const [activeMonthIdx, setActiveMonthIdx] = useState(null); // タップされた月次のインデックス
   const [rankingGrade, setRankingGrade] = useState(''); // ランキング用学年フィルター ("" = すべて)
   const [showAllRanking, setShowAllRanking] = useState(false); // もっと見るフラグ
+  const [showAllLatest, setShowAllLatest] = useState(false);
   const [rankingDetailMember, setRankingDetailMember] = useState(''); // ランキング内詳細表示部員名
   const [modalGrade, setModalGrade] = useState(''); // モーダル内学年フィルター
   const [replyDrafts, setReplyDrafts] = useState({});
@@ -232,12 +233,12 @@ export default function StatsDashboard({
       setActiveMonthIdx(null);
     }, 0);
   }, [rankingDetailMember]);
-  const CACHE_KEY = 'tf_member_stats_cache';
-  const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
+  const CACHE_KEY = 'tf_member_stats_cache_v2';
+  const CACHE_TS_KEY = 'tf_member_stats_cache_v2_ts';
 
   const [members, setMembers] = useState(() => {
     try {
-      const cached = localStorage.getItem('tf_member_stats_cache');
+      const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed)) return parsed;
@@ -250,8 +251,8 @@ export default function StatsDashboard({
 
   const [loading, setLoading] = useState(() => {
     try {
-      const cachedData = localStorage.getItem('tf_member_stats_cache');
-      const cachedTs = localStorage.getItem('tf_member_stats_cache_ts');
+      const cachedData = localStorage.getItem(CACHE_KEY);
+      const cachedTs = localStorage.getItem(CACHE_TS_KEY);
       return !(cachedData && cachedTs);
     } catch {
       return true;
@@ -594,7 +595,7 @@ export default function StatsDashboard({
     return showAllRanking ? rankingData : rankingData.slice(0, 10);
   }, [rankingData, showAllRanking]);
 
-  const latestSocialRecords = useMemo(() => {
+  const allLatestSocialRecords = useMemo(() => {
     return members
       .flatMap(member => (member.records || []).map(record => ({
         ...record,
@@ -602,8 +603,12 @@ export default function StatsDashboard({
       })))
       .filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
       .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 10);
+      .slice(0, 30);
   }, [members, todayIso]);
+
+  const latestSocialRecords = useMemo(() => {
+    return showAllLatest ? allLatestSocialRecords : allLatestSocialRecords.slice(0, 5);
+  }, [allLatestSocialRecords, showAllLatest]);
 
   const handleSubmitReply = async (memberName, date) => {
     const key = `${memberName}__${date}`;
@@ -1069,7 +1074,7 @@ export default function StatsDashboard({
           <div className="absolute inset-0 border-3 border-t-blue-500 rounded-full animate-spin" />
         </div>
         <div className="text-center space-y-1">
-          <p className="font-extrabold text-sm text-slate-800">走行データ同期中</p>
+          <p className="font-extrabold text-sm text-slate-800">同期中</p>
         </div>
       </div>
     );
@@ -1085,7 +1090,7 @@ export default function StatsDashboard({
           onClick={() => fetchAndParseData(true)}
           className="mt-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs font-black text-blue-600 active:scale-95 transition-all shadow-sm"
         >
-          再読み込み
+          更新
         </button>
       </div>
     );
@@ -1102,9 +1107,8 @@ export default function StatsDashboard({
                 <div className="w-6 h-6 rounded-lg bg-[#f2f2f7] flex items-center justify-center text-[#007aff]">
                   <Activity size={13} />
                 </div>
-                <h3 className="text-sm font-black text-slate-800">最新の練習記録</h3>
+                <h3 className="text-sm font-black text-slate-800">最近</h3>
               </div>
-              <span className="text-[10px] font-bold text-slate-400">10件</span>
             </div>
 
             {latestSocialRecords.length === 0 ? (
@@ -1141,6 +1145,15 @@ export default function StatsDashboard({
                     </button>
                   );
                 })}
+                {allLatestSocialRecords.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllLatest(v => !v)}
+                    className="w-full h-10 rounded-2xl bg-[#f2f2f7] text-slate-600 text-xs font-black active:scale-[0.99] transition-all"
+                  >
+                    {showAllLatest ? '閉じる' : `もっと見る (${allLatestSocialRecords.length - 5})`}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1395,10 +1408,11 @@ export default function StatsDashboard({
             
             <button
               onClick={() => setShowMemberSheet(true)}
+              aria-label="メンバーを切り替え"
+              title="メンバーを切り替え"
               className="flex items-center gap-1 bg-[#f2f2f7] text-slate-700 px-3.5 py-2.5 rounded-2xl text-xs font-black active:scale-95 transition-all"
             >
-              <span>切り替え</span>
-              <ChevronRight size={13} />
+              <Users size={14} />
             </button>
           </div>
 
@@ -1415,7 +1429,7 @@ export default function StatsDashboard({
                   <div className="flex items-center gap-1 text-slate-400 mb-1">
                     <Activity size={12} className="text-blue-500" />
                     <span className="text-[9px] font-black uppercase tracking-wider">
-                      期間内合計走行距離
+                      合計
                     </span>
                   </div>
                   <p className="text-3xl font-black text-slate-800 leading-none">
@@ -1693,7 +1707,7 @@ export default function StatsDashboard({
 
               {/* ④ 練習履歴タイムライン */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1 block">練習活動タイムライン</h4>
+                <h4 className="text-[11px] font-black text-slate-500 px-1 block">履歴</h4>
                 
                 <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
                   {rankingDetailMemberData.daily.filter(hasTimelineContent).length === 0 ? (
@@ -1802,18 +1816,21 @@ export default function StatsDashboard({
                 {onOpenInputDrawer && selectedMember && (
                   <button
                     onClick={onOpenInputDrawer}
+                    aria-label="記録を入力"
+                    title="記録を入力"
                     className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
                   >
                     <Activity size={13} />
-                    <span>記録を入力</span>
+                    <span className="hidden sm:inline">記録</span>
                   </button>
                 )}
                 <button
                   onClick={() => setShowMemberSheet(true)}
+                  aria-label="メンバーを切り替え"
+                  title="メンバーを切り替え"
                   className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
                 >
-                  <span>切り替え</span>
-                  <ChevronRight size={13} />
+                  <Users size={14} />
                 </button>
               </div>
             </div>
@@ -1832,7 +1849,7 @@ export default function StatsDashboard({
                   <div className="flex items-center gap-1 text-slate-400 mb-1">
                     <Activity size={12} className="text-blue-500" />
                     <span className="text-[9px] font-black uppercase tracking-wider">
-                      {sortKey === 'total' ? '期間内合計走行距離' : `期間内合計 ${INTENSITY_COLORS[sortKey].name.split(' (')[0]} 走行距離`}
+                      {sortKey === 'total' ? '合計' : INTENSITY_COLORS[sortKey].name.split(' (')[0]}
                     </span>
                   </div>
                   <p className="text-3xl font-black text-slate-800 leading-none">
@@ -2143,7 +2160,7 @@ export default function StatsDashboard({
 
               {/* ④ 練習履歴タイムライン (チャット吹き出し・クリーンUI) */}
               <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-1 block">練習活動タイムライン</h4>
+                <h4 className="text-[11px] font-black text-slate-500 px-1 block">履歴</h4>
                 
                 <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
                   {selectedMemberData.daily.filter(hasTimelineContent).length === 0 ? (
@@ -2271,7 +2288,6 @@ export default function StatsDashboard({
             >
               <div>
                 <h3 className="text-base font-black text-slate-800">部員を選択</h3>
-                <p className="text-[9px] text-slate-400 font-bold block mt-0.5">タップして切り替え</p>
               </div>
               <button 
                 onClick={closeMemberSheet}

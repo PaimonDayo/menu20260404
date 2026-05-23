@@ -543,8 +543,8 @@ export default function App() {
   }
 
   const handleRecordSubmitted = useCallback((payload) => {
-    const CACHE_KEY = 'tf_member_stats_cache';
-    const CACHE_TS_KEY = 'tf_member_stats_cache_ts';
+    const CACHE_KEY = 'tf_member_stats_cache_v2';
+    const CACHE_TS_KEY = 'tf_member_stats_cache_v2_ts';
 
     try {
       const cached = localStorage.getItem(CACHE_KEY);
