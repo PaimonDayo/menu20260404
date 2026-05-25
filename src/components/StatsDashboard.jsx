@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send } from 'lucide-react';
-import { fetchAllMembersStats, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply } from '../services/sheetsService';
+import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send, Heart } from 'lucide-react';
+import { fetchAllMembersStats, fetchLatestRecords, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply, fetchRecordReactions, toggleRecordReaction, getReactionActorId } from '../services/sheetsService';
 
 // 強度別のプレミアム・パステルカラー設定 (スプレッドシート準拠の配色)
 const INTENSITY_COLORS = {
@@ -40,6 +40,23 @@ const hasTimelineContent = (rec) => {
     || Boolean((rec.comment || '').trim())
     || (Array.isArray(rec.replies) && rec.replies.some(reply => Boolean((reply || '').trim())));
 };
+
+const buildLatestRecordsFromMembers = (members, todayIso, limit = 30) => {
+  return members
+    .flatMap(member => (member.records || []).map(record => ({
+      ...record,
+      memberName: member.name,
+    })))
+    .filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, limit);
+};
+
+const REACTION_OPTIONS = [
+  { type: 'like', label: 'いいね' },
+];
+
+const makeReactionTargetKey = (memberName, date) => `${memberName}__${date}`;
 
 const TimelineRecordFields = ({ rec, focusKey = 'total' }) => {
   if (!rec) return null;
@@ -208,6 +225,11 @@ export default function StatsDashboard({
   const [modalGrade, setModalGrade] = useState(''); // モーダル内学年フィルター
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replySubmittingKey, setReplySubmittingKey] = useState('');
+  const [expandedFeedbackKeys, setExpandedFeedbackKeys] = useState({});
+  const [reactions, setReactions] = useState([]);
+  const [reactionSubmittingKey, setReactionSubmittingKey] = useState('');
+  const [latestRecords, setLatestRecords] = useState(null);
+  const reactionActorId = useMemo(() => getReactionActorId(), []);
 
   useEffect(() => {
     if (!resetSignal) return;
@@ -233,6 +255,40 @@ export default function StatsDashboard({
       setActiveMonthIdx(null);
     }, 0);
   }, [rankingDetailMember]);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchRecordReactions()
+      .then(rows => {
+        if (mounted) setReactions(rows);
+      })
+      .catch(err => {
+        console.warn('リアクションの取得に失敗しました:', err);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (showSection !== 'ranking') return;
+
+    let mounted = true;
+    fetchLatestRecords({ limit: 30 })
+      .then(records => {
+        if (mounted && Array.isArray(records)) {
+          setLatestRecords(records);
+        }
+      })
+      .catch(err => {
+        console.warn('最近の練習記録の軽量取得に失敗しました。全体データから生成します:', err);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [showSection]);
+
   const CACHE_KEY = 'tf_member_stats_cache_v2';
   const CACHE_TS_KEY = 'tf_member_stats_cache_v2_ts';
 
@@ -335,22 +391,6 @@ export default function StatsDashboard({
       return a.localeCompare(b);
     });
   }, [members]);
-
-
-
-  // membersが読み込まれた時の初期設定
-  useEffect(() => {
-    if (members.length > 0 && !selectedMember) {
-      // ユーザーの初期状態をセット。全学年の最初のメンバーをデフォルトメンバーとする
-      const defaultMember = members[0];
-      
-      setTimeout(() => {
-        setSelectedMember(defaultMember.name);
-      }, 0);
-    }
-  }, [members, selectedMember, setSelectedMember]);
-
-
 
   // スプレッドシートからのデータ取得とパース
   const fetchAndParseData = async (force = false, isBackground = false) => {
@@ -527,6 +567,7 @@ export default function StatsDashboard({
       const { members: newMembers } = e.detail || {};
       if (!Array.isArray(newMembers)) return;
       setMembers(newMembers);
+      setLatestRecords(buildLatestRecordsFromMembers(newMembers, todayIso));
       setLoading(false);
       setError(null);
       if (onDataLoaded) {
@@ -534,9 +575,115 @@ export default function StatsDashboard({
       }
     };
 
+    const handleRecordSubmitted = (e) => {
+      const { payload } = e.detail || {};
+      if (!payload?.memberName || !payload?.date) return;
+
+      const toNum = (value) => {
+        const num = parseFloat(value);
+        return Number.isFinite(num) ? Math.round(num * 100) / 100 : 0;
+      };
+
+      setMembers(prevMembers => prevMembers.map(member => {
+        if (member.name !== payload.memberName) return member;
+
+        const records = Array.isArray(member.records) ? [...member.records] : [];
+        const existingIndex = records.findIndex(record => record.date === payload.date);
+
+        if (payload.isDelete) {
+          return {
+            ...member,
+            records: records.filter(record => record.date !== payload.date),
+          };
+        }
+
+        const existing = existingIndex >= 0 ? records[existingIndex] : {};
+        const jog = toNum(payload.jog);
+        const mlt = toNum(payload.mlt);
+        const cv = toNum(payload.cv);
+        const speed = toNum(payload.speed);
+        const total = payload.total !== undefined && payload.total !== ''
+          ? toNum(payload.total)
+          : Math.round((jog + mlt + cv + speed) * 100) / 100;
+
+        const nextRecord = {
+          ...existing,
+          date: payload.date,
+          total,
+          jog,
+          mlt,
+          cv,
+          speed,
+          strides: toNum(payload.strides),
+          reinforce: payload.reinforce || '',
+          result: payload.result || '',
+          comment: payload.comment || '',
+          replies: existing.replies || [],
+        };
+
+        if (existingIndex >= 0) {
+          records[existingIndex] = nextRecord;
+        } else {
+          records.push(nextRecord);
+        }
+
+        records.sort((a, b) => a.date.localeCompare(b.date));
+        return { ...member, records };
+      }));
+      setLatestRecords(prev => {
+        if (!Array.isArray(prev)) return prev;
+        if (payload.isDelete) {
+          return prev.filter(record => !(record.memberName === payload.memberName && record.date === payload.date));
+        }
+
+        const toNumRecord = (value) => {
+          const num = parseFloat(value);
+          return Number.isFinite(num) ? Math.round(num * 100) / 100 : 0;
+        };
+        const jog = toNumRecord(payload.jog);
+        const mlt = toNumRecord(payload.mlt);
+        const cv = toNumRecord(payload.cv);
+        const speed = toNumRecord(payload.speed);
+        const total = payload.total !== undefined && payload.total !== ''
+          ? toNumRecord(payload.total)
+          : Math.round((jog + mlt + cv + speed) * 100) / 100;
+        const existing = prev.find(record => record.memberName === payload.memberName && record.date === payload.date) || {};
+        const nextRecord = {
+          ...existing,
+          memberName: payload.memberName,
+          date: payload.date,
+          total,
+          jog,
+          mlt,
+          cv,
+          speed,
+          strides: toNumRecord(payload.strides),
+          reinforce: payload.reinforce || '',
+          result: payload.result || '',
+          comment: payload.comment || '',
+          replies: existing.replies || [],
+        };
+
+        if (!hasTimelineContent(nextRecord) || nextRecord.date > todayIso) {
+          return prev.filter(record => !(record.memberName === payload.memberName && record.date === payload.date));
+        }
+
+        return [
+          nextRecord,
+          ...prev.filter(record => !(record.memberName === payload.memberName && record.date === payload.date)),
+        ]
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 30);
+      });
+      setLoading(false);
+      setError(null);
+    };
+
     window.addEventListener('tf_stats_cache_updated', handleCacheUpdated);
+    window.addEventListener('tf_record_submitted', handleRecordSubmitted);
     return () => {
       window.removeEventListener('tf_stats_cache_updated', handleCacheUpdated);
+      window.removeEventListener('tf_record_submitted', handleRecordSubmitted);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -596,19 +743,29 @@ export default function StatsDashboard({
   }, [rankingData, showAllRanking]);
 
   const allLatestSocialRecords = useMemo(() => {
-    return members
-      .flatMap(member => (member.records || []).map(record => ({
-        ...record,
-        memberName: member.name,
-      })))
-      .filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .slice(0, 30);
-  }, [members, todayIso]);
+    return Array.isArray(latestRecords)
+      ? latestRecords.filter(record => record.date && record.date <= todayIso && hasTimelineContent(record)).slice(0, 30)
+      : buildLatestRecordsFromMembers(members, todayIso);
+  }, [latestRecords, members, todayIso]);
 
   const latestSocialRecords = useMemo(() => {
     return showAllLatest ? allLatestSocialRecords : allLatestSocialRecords.slice(0, 5);
   }, [allLatestSocialRecords, showAllLatest]);
+
+  const reactionSummary = useMemo(() => {
+    const summary = {};
+    reactions.forEach(item => {
+      if (!item?.targetKey || !item?.type) return;
+      if (!summary[item.targetKey]) {
+        summary[item.targetKey] = { counts: {}, mine: new Set() };
+      }
+      summary[item.targetKey].counts[item.type] = (summary[item.targetKey].counts[item.type] || 0) + 1;
+      if (item.actorId === reactionActorId) {
+        summary[item.targetKey].mine.add(item.type);
+      }
+    });
+    return summary;
+  }, [reactions, reactionActorId]);
 
   const handleSubmitReply = async (memberName, date) => {
     const key = `${memberName}__${date}`;
@@ -631,12 +788,145 @@ export default function StatsDashboard({
           }),
         };
       }));
+      setLatestRecords(prev => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.map(record => {
+          if (record.memberName !== memberName || record.date !== date) return record;
+          return {
+            ...record,
+            replies: [...(record.replies || []), reply],
+          };
+        });
+      });
       setReplyDrafts(prev => ({ ...prev, [key]: '' }));
     } catch (err) {
       window.alert(`リプライの送信に失敗しました: ${err.message}`);
     } finally {
       setReplySubmittingKey('');
     }
+  };
+
+  const handleToggleReaction = async (memberName, date, type) => {
+    const targetKey = makeReactionTargetKey(memberName, date);
+    const submitKey = `${targetKey}__${type}`;
+    const optimisticItem = {
+      createdAt: new Date().toISOString(),
+      targetKey,
+      targetMember: memberName,
+      targetDate: date,
+      type,
+      actorId: reactionActorId,
+    };
+    const optimistic = [...reactions, optimisticItem];
+
+    setReactionSubmittingKey(submitKey);
+    setReactions(optimistic);
+    try {
+      await toggleRecordReaction({ memberName, date, type });
+    } catch (err) {
+      setReactions(reactions);
+      window.alert(`リアクションの送信に失敗しました: ${err.message}`);
+    } finally {
+      setReactionSubmittingKey('');
+    }
+  };
+
+  const renderReactionBar = (memberName, rec) => {
+    if (!memberName || !rec?.date) return null;
+    const targetKey = makeReactionTargetKey(memberName, rec.date);
+    const summary = reactionSummary[targetKey] || { counts: {}, mine: new Set() };
+    const item = REACTION_OPTIONS[0];
+    const count = summary.counts[item.type] || 0;
+    const mine = summary.mine.has(item.type);
+    const submitKey = `${targetKey}__${item.type}`;
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleToggleReaction(memberName, rec.date, item.type)}
+        disabled={reactionSubmittingKey === submitKey}
+        aria-label={item.label}
+        className={`h-7 min-w-7 px-2 rounded-full border text-[10px] font-black transition-all active:scale-95 inline-flex items-center justify-center gap-1 ${
+          mine
+            ? 'bg-rose-50 border-rose-100 text-rose-500'
+            : 'bg-[#f2f2f7] border-slate-100 text-slate-400'
+        }`}
+      >
+        <Heart size={13} fill={mine ? 'currentColor' : 'none'} />
+        {count > 0 && <span>{count}</span>}
+      </button>
+    );
+  };
+
+  const renderFeedbackControls = (memberName, rec, options = {}) => {
+    if (!memberName || !rec?.date) return null;
+    const key = `${memberName}__${rec.date}`;
+    const replyCount = rec.replies?.length || 0;
+    const storedExpanded = expandedFeedbackKeys[key];
+    const allowReplyInput = options.allowReplyInput !== false;
+    const alwaysExpanded = Boolean(options.alwaysExpanded);
+    const expanded = allowReplyInput && (
+      alwaysExpanded || (storedExpanded === undefined ? Boolean(options.defaultExpanded) : Boolean(storedExpanded))
+    );
+    const showReplies = replyCount > 0;
+
+    return (
+      <div className="pt-1">
+        <div className="flex items-center justify-end gap-1.5">
+          {alwaysExpanded || !allowReplyInput ? (
+            replyCount > 0 && (
+              <span className="h-7 px-2.5 rounded-full bg-[#f2f2f7] text-[#007aff] text-[10px] font-black inline-flex items-center">
+                リプライ {replyCount}
+              </span>
+            )
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExpandedFeedbackKeys(prev => ({ ...prev, [key]: !expanded }))}
+              className={`h-7 px-2.5 rounded-full text-[10px] font-black transition-all active:scale-95 ${
+                expanded || replyCount > 0
+                  ? 'bg-[#f2f2f7] text-[#007aff]'
+                  : 'bg-transparent text-slate-400'
+              }`}
+            >
+              {replyCount > 0 ? `リプライ ${replyCount}` : 'リプライ'}
+            </button>
+          )}
+          {renderReactionBar(memberName, rec)}
+        </div>
+
+        {(expanded || showReplies) && (
+          <div className="mt-2 space-y-2">
+            {showReplies && (
+              <div className="space-y-1.5 pl-2 border-l-2 border-[#f2f2f7]">
+                {rec.replies.map((reply, replyIdx) => (
+                  <p key={replyIdx} className="text-[10px] leading-relaxed text-slate-500 bg-[#f2f2f7]/70 rounded-2xl px-3 py-2">{reply}</p>
+                ))}
+              </div>
+            )}
+            {expanded && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={replyDrafts[key] || ''}
+                  onChange={(e) => setReplyDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+                  placeholder="リプライ"
+                  className="flex-1 min-w-0 px-3 py-2 rounded-full bg-[#f2f2f7] text-[11px] font-bold text-slate-700 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSubmitReply(memberName, rec.date)}
+                  disabled={replySubmittingKey === key}
+                  className="w-8 h-8 rounded-full bg-[#007aff] text-white flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all"
+                >
+                  {replySubmittingKey === key ? <RefreshCcw size={12} className="animate-spin" /> : <Send size={12} />}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   // 選択されたメンバーの集計データ
@@ -1119,13 +1409,16 @@ export default function StatsDashboard({
               <div className="space-y-2">
                 {latestSocialRecords.map((rec, idx) => {
                   const dateText = rec.date ? rec.date.substring(5).replace('-', '/') : '';
-                  const replyCount = rec.replies?.length || 0;
                   return (
-                    <button
+                    <div
                       key={`${rec.memberName}-${rec.date}-${idx}`}
-                      onClick={() => setRankingDetailMember(rec.memberName)}
-                      className="w-full text-left p-3 rounded-2xl bg-white border border-slate-100 hover:bg-[#f2f2f7]/60 active:scale-[0.99] transition-all"
+                      className="rounded-2xl bg-white border border-slate-100 overflow-hidden"
                     >
+                      <button
+                        type="button"
+                        onClick={() => setRankingDetailMember(rec.memberName)}
+                        className="w-full text-left p-3 hover:bg-[#f2f2f7]/60 active:scale-[0.99] transition-all"
+                      >
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <span className="text-[9px] text-slate-400 font-black block leading-none">{dateText}</span>
@@ -1139,10 +1432,13 @@ export default function StatsDashboard({
                         {rec.result && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-700 truncate max-w-full">{rec.result}</span>}
                         {rec.strides > 0 && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">流し {rec.strides}本</span>}
                         {rec.reinforce && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">補強</span>}
-                        {replyCount > 0 && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-[#007aff]">リプライ {replyCount}</span>}
                       </div>
                       {rec.comment && <p className="mt-2 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{rec.comment}</p>}
-                    </button>
+                      </button>
+                      <div className="px-3 pb-3">
+                        {renderFeedbackControls(rec.memberName, rec, { allowReplyInput: false })}
+                      </div>
+                    </div>
                   );
                 })}
                 {allLatestSocialRecords.length > 5 && (
@@ -1755,32 +2051,7 @@ export default function StatsDashboard({
                                   {rec.menu}
                                 </p>
                               )}
-                              {rec.replies?.length > 0 && (
-                                <div className="space-y-1.5 pl-2 border-l-2 border-[#f2f2f7]">
-                                  {rec.replies.map((reply, replyIdx) => (
-                                    <p key={replyIdx} className="text-[10px] leading-relaxed text-slate-500 bg-[#f2f2f7]/70 rounded-2xl px-3 py-2">{reply}</p>
-                                  ))}
-                                </div>
-                              )}
-                              {rec.comment && (
-                                <div className="flex items-center gap-2 pt-1">
-                                  <input
-                                    type="text"
-                                    value={replyDrafts[`${rankingDetailMember}__${rec.date}`] || ''}
-                                    onChange={(e) => setReplyDrafts(prev => ({ ...prev, [`${rankingDetailMember}__${rec.date}`]: e.target.value }))}
-                                    placeholder="リプライ"
-                                    className="flex-1 min-w-0 px-3 py-2 rounded-full bg-[#f2f2f7] text-[11px] font-bold text-slate-700 focus:outline-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSubmitReply(rankingDetailMember, rec.date)}
-                                    disabled={replySubmittingKey === `${rankingDetailMember}__${rec.date}`}
-                                    className="w-8 h-8 rounded-full bg-[#007aff] text-white flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all"
-                                  >
-                                    {replySubmittingKey === `${rankingDetailMember}__${rec.date}` ? <RefreshCcw size={12} className="animate-spin" /> : <Send size={12} />}
-                                  </button>
-                                </div>
-                              )}
+                              {renderFeedbackControls(rankingDetailMember, rec, { alwaysExpanded: true })}
                             </div>
                           </div>
                         </div>
@@ -1837,8 +2108,9 @@ export default function StatsDashboard({
           </div>
 
           {!selectedMemberData ? (
-            <div className="text-center py-12 text-slate-400 font-bold text-xs border border-dashed border-slate-100 rounded-3xl bg-white shadow-sm">
-              メンバーデータがありません
+            <div className="text-center py-14 text-slate-400 font-bold text-xs border border-dashed border-slate-100 rounded-3xl bg-white shadow-sm">
+              <User size={28} className="mx-auto mb-3 text-slate-300" />
+              <p className="text-slate-500 text-sm font-black">部員を選択してください</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -2210,6 +2482,7 @@ export default function StatsDashboard({
                             )}
 
                             <TimelineRecordFields rec={rec} focusKey={sortKey} />
+                            {renderFeedbackControls(selectedMember, rec, { alwaysExpanded: true })}
 
                             {/* 練習メニュー */}
                             <div className="space-y-2 relative z-10 text-xs">
@@ -2336,7 +2609,8 @@ export default function StatsDashboard({
                   );
                 }
                 return filtered.map(m => {
-                  const isSelected = selectedMember === m.name;
+                  const activeMemberForSheet = showSection === 'ranking' && rankingDetailMember ? rankingDetailMember : selectedMember;
+                  const isSelected = activeMemberForSheet === m.name;
                   const grade = getGradeFromName(m.name);
                   const nameOnly = getOnlyName(m.name);
                   
@@ -2344,7 +2618,11 @@ export default function StatsDashboard({
                     <button
                       key={m.name}
                       onClick={() => {
-                        setSelectedMember(m.name);
+                        if (showSection === 'ranking' && rankingDetailMember) {
+                          setRankingDetailMember(m.name);
+                        } else {
+                          setSelectedMember(m.name);
+                        }
                         closeMemberSheet();
                       }}
                       className={`flex items-center gap-2.5 p-3.5 rounded-2xl border text-left transition-all ${

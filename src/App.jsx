@@ -315,14 +315,14 @@ export default function App() {
      const [myPageResetKey, setMyPageResetKey] = useState(0);
      const [showInputDrawer, setShowInputDrawer] = useState(false);
 
-     // メンバー状態の永続化
+    // メンバー状態の永続化。v2では初回表示を未選択にするため旧キーは読まない。
      const [selectedMember, setSelectedMember] = useState(() => {
-       return localStorage.getItem('tf_selected_member') || '';
+       return localStorage.getItem('tf_selected_member_v2') || '';
      });
 
      useEffect(() => {
        if (selectedMember) {
-         localStorage.setItem('tf_selected_member', selectedMember);
+         localStorage.setItem('tf_selected_member_v2', selectedMember);
        }
      }, [selectedMember]);
 
@@ -547,6 +547,10 @@ export default function App() {
     const CACHE_TS_KEY = 'tf_member_stats_cache_v2_ts';
 
     try {
+      if (payload?.memberName && payload?.date) {
+        window.dispatchEvent(new CustomEvent('tf_record_submitted', { detail: { payload } }));
+      }
+
       const cached = localStorage.getItem(CACHE_KEY);
       if (!cached || !payload?.memberName || !payload?.date) return;
 

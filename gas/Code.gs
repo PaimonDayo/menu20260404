@@ -12,6 +12,7 @@
 
 const CACHE_EXPIRATION_SECONDS = 600;
 const SPREADSHEET_ID = '1uAo7E8_rMbUZlml1H0vj119htQeoa2eMWqASUXQTqgg';
+const REACTIONS_SPREADSHEET_ID = '1hsmysg1b5uInd7mPE110hmzn0C2V5o87jRRatn-xhVQ';
 const SHEET_NAME = 'Sheet1';
 
 function getSpreadsheet() {
@@ -25,6 +26,9 @@ function doGet(e) {
     if (action === 'fetchAll') {
       return handleFetchAll(e.parameter.bypassCache === 'true');
     }
+    if (action === 'fetchLatestRecords') {
+      return handleFetchLatestRecords(e.parameter.limit, e.parameter.bypassCache === 'true');
+    }
     if (action === 'fetchPractice') {
       return handleFetchPractice(e.parameter.month);
     }
@@ -33,6 +37,9 @@ function doGet(e) {
     }
     if (action === 'replySupport') {
       return createJsonResponse({ replySupport: true });
+    }
+    if (action === 'fetchReactions') {
+      return handleFetchReactions();
     }
 
     return HtmlService.createTemplateFromFile('index')
@@ -50,9 +57,13 @@ function doPost(e) {
     const postData = JSON.parse(e.postData.contents);
     const result = postData.action === 'addReply'
       ? addPracticeReply(postData)
-      : writePracticeRecord(postData);
+      : postData.action === 'toggleReaction'
+        ? togglePracticeReaction(postData)
+        : writePracticeRecord(postData);
 
-    CacheService.getScriptCache().remove('all_member_stats');
+    const cache = CacheService.getScriptCache();
+    cache.remove('all_member_stats');
+    cache.remove('latest_records_30');
     return createJsonResponse(result);
   } catch (err) {
     return createJsonResponse({ error: err.toString() }, 500);
@@ -174,6 +185,51 @@ function handleFetchAll(bypassCache) {
   }
 
   return createJsonResponse({ source: 'sheets', data: sortedData });
+}
+
+function handleFetchLatestRecords(limitParam, bypassCache) {
+  const limit = Math.max(1, Math.min(parseInt(limitParam || '30', 10) || 30, 100));
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'latest_records_' + limit;
+
+  if (!bypassCache) {
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return createJsonResponse({ source: 'cache', data: JSON.parse(cachedData) });
+    }
+  }
+
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const latest = [];
+  const sheets = getSpreadsheet().getSheets();
+  for (const sheet of sheets) {
+    const name = sheet.getName();
+    if (!/^[BM]\d/.test(name)) continue;
+
+    const records = parseMemberSheet(sheet);
+    if (!records) continue;
+
+    records.forEach(record => {
+      if (record.date && record.date <= today) {
+        latest.push({
+          ...record,
+          memberName: name
+        });
+      }
+    });
+  }
+
+  const data = latest
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, limit);
+
+  try {
+    cache.put(cacheKey, JSON.stringify(data), CACHE_EXPIRATION_SECONDS);
+  } catch (err) {
+    Logger.log('最近記録キャッシュ保存失敗: ' + err.toString());
+  }
+
+  return createJsonResponse({ source: 'sheets', data });
 }
 
 function handleFetchPractice(month) {
@@ -404,6 +460,88 @@ function addPracticeReply(data) {
   sheet.getRange(rowIdx + 1, targetCol + 1).setValue(reply.toString().trim());
 
   return { success: true, action: 'replied', row: rowIdx + 1, col: targetCol + 1 };
+}
+
+function getReactionsSpreadsheet() {
+  return SpreadsheetApp.openById(REACTIONS_SPREADSHEET_ID);
+}
+
+function getReactionSheetName(date) {
+  const parsed = new Date(date);
+  if (!isNaN(parsed)) {
+    return (parsed.getMonth() + 1) + '月';
+  }
+  const match = date.toString().match(/-(\d{2})-/);
+  if (match) {
+    return parseInt(match[1], 10) + '月';
+  }
+  return 'その他';
+}
+
+function getOrCreateReactionSheet(date) {
+  const ss = getReactionsSpreadsheet();
+  const sheetName = getReactionSheetName(date);
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['createdAt', 'targetKey', 'targetMember', 'targetDate', 'type', 'actorId']);
+  }
+
+  return sheet;
+}
+
+function makeTargetKey(memberName, date) {
+  return memberName + '__' + date;
+}
+
+function handleFetchReactions() {
+  const ss = getReactionsSpreadsheet();
+  const rows = [];
+
+  ss.getSheets().forEach(sheet => {
+    const values = sheet.getDataRange().getDisplayValues();
+    for (let i = 1; i < values.length; i++) {
+      const row = values[i];
+      const targetKey = row[1] || makeTargetKey(row[2], row[3]);
+      const type = row[4];
+      const actorId = row[5];
+      if (!targetKey || !type) continue;
+      rows.push({
+        createdAt: row[0],
+        targetKey,
+        targetMember: row[2],
+        targetDate: row[3],
+        type,
+        actorId
+      });
+    }
+  });
+
+  return createJsonResponse({ reactions: rows });
+}
+
+function togglePracticeReaction(data) {
+  const { memberName, date, type, actorId } = data;
+  if (!memberName || !date || !type || !actorId) {
+    throw new Error('memberName, date, type, actorId は必須です。');
+  }
+
+  const targetKey = makeTargetKey(memberName, date);
+  const sheet = getOrCreateReactionSheet(date);
+
+  sheet.appendRow([
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss'),
+    targetKey,
+    memberName,
+    date,
+    type,
+    actorId
+  ]);
+
+  return { success: true, action: 'added', targetKey, type };
 }
 
 function readPracticeReplies(row, header) {

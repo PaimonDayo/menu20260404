@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Loader2, Send, Trash2, X } from 'lucide-react';
+import { Calculator, Loader2, Send, X } from 'lucide-react';
 import { fetchMemberDayRecord, submitPracticeRecord } from '../services/sheetsService';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -75,7 +75,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   const [strides, setStrides] = useState('');
   const [reinforce, setReinforce] = useState('');
   const [comment, setComment] = useState('');
-  const [recordExists, setRecordExists] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [recordCache, setRecordCache] = useState({});
@@ -102,7 +101,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
     setStrides('');
     setReinforce('');
     setComment('');
-    setRecordExists(false);
   }, []);
 
   const applyRecord = useCallback((res) => {
@@ -116,7 +114,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       setStrides(data.strides ? String(data.strides) : '');
       setReinforce(data.reinforce || '');
       setComment(data.comment || '');
-      setRecordExists(true);
       return;
     }
     clearForm();
@@ -214,24 +211,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       onClose();
     } catch (err) {
       window.alert(`保存に失敗しました: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    const ok = window.confirm(`${selectedDate.full} の練習記録を削除します。よろしいですか？\n\n※実際の距離列に数式がある場合、数式は保護されます。`);
-    if (!ok) return;
-
-    setSubmitting(true);
-    try {
-      await submitPracticeRecord({ memberName, date, isDelete: true });
-      clearForm();
-      setRecordCache((prev) => ({ ...prev, [cacheKeyFor(memberName, date)]: { exists: false } }));
-      onRecordSubmitted?.({ memberName, date, isDelete: true });
-      onClose();
-    } catch (err) {
-      window.alert(`削除に失敗しました: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -356,12 +335,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
             </div>
 
             <div className="flex gap-2 pt-2">
-              {recordExists && (
-                <button type="button" onClick={handleDelete} disabled={submitting} aria-label="削除" title="削除" className="h-12 w-12 bg-[#ffe5e5] text-[#ff3b30] rounded-2xl flex items-center justify-center text-xs font-extrabold border border-[#ff3b30]/10 active:opacity-75 shrink-0">
-                  <Trash2 size={14} />
-                </button>
-              )}
-
               <button type="submit" disabled={submitting} className="h-12 min-w-0 flex-1 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)] overflow-hidden">
                 {submitting ? (
                   <>
@@ -371,7 +344,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                 ) : (
                   <>
                     <Send size={12} className="shrink-0" />
-                    <span className="whitespace-nowrap">{recordExists ? '更新' : '保存'}</span>
+                    <span className="whitespace-nowrap">保存</span>
                   </>
                 )}
               </button>

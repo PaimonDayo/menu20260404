@@ -602,6 +602,31 @@ export async function fetchAllMembersStats(bypassCache = false) {
   return Array.isArray(json?.data) ? json.data : null;
 }
 
+export async function fetchLatestRecords({ limit = 30, bypassCache = false } = {}) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    action: 'fetchLatestRecords',
+    limit: String(limit),
+  });
+  if (bypassCache) {
+    params.set('bypassCache', 'true');
+  }
+
+  const res = await fetch(`${GAS_API_URL}?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`GAS最近記録の取得に失敗しました (${res.status})`);
+  }
+
+  const json = await readJsonResponse(res, 'GAS最近記録取得');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return Array.isArray(json?.data) ? json.data : null;
+}
+
 export async function fetchMemberDayRecord(memberName, date) {
   if (!GAS_API_URL || GAS_API_URL.trim() === '') {
     return null;
@@ -666,6 +691,66 @@ export async function submitRecordReply({ memberName, date, reply }) {
   }
 
   const json = await readJsonResponse(response, 'リプライ送信');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return json;
+}
+
+export function getReactionActorId() {
+  const key = 'tf_reaction_actor_id';
+  let actorId = localStorage.getItem(key);
+  if (!actorId) {
+    const randomPart = Math.random().toString(36).slice(2, 10);
+    actorId = `device_${Date.now().toString(36)}_${randomPart}`;
+    localStorage.setItem(key, actorId);
+  }
+  return actorId;
+}
+
+export async function fetchRecordReactions() {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    return [];
+  }
+
+  const res = await fetch(`${GAS_API_URL}?action=fetchReactions&t=${Date.now()}`);
+  if (!res.ok) {
+    throw new Error(`リアクションの取得に失敗しました (${res.status})`);
+  }
+
+  const json = await readJsonResponse(res, 'リアクション取得');
+  if (json?.error) {
+    throw new Error(json.error);
+  }
+  return Array.isArray(json?.reactions) ? json.reactions : [];
+}
+
+export async function toggleRecordReaction({ memberName, date, type }) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    throw new Error('config.js に GAS_API_URL が設定されていません。');
+  }
+
+  const response = await fetch(GAS_API_URL, {
+    method: 'POST',
+    mode: 'cors',
+    redirect: 'follow',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body: JSON.stringify({
+      action: 'toggleReaction',
+      memberName,
+      date,
+      type,
+      actorId: getReactionActorId(),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`リアクションの送信に失敗しました (${response.status})`);
+  }
+
+  const json = await readJsonResponse(response, 'リアクション送信');
   if (json?.error) {
     throw new Error(json.error);
   }
