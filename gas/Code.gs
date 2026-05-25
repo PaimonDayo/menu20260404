@@ -113,6 +113,15 @@ function submitData(data) {
   }
 }
 
+function normalizeHeaderCell(cell) {
+  return cell.toString().replace(/\s+/g, '').trim();
+}
+
+function findHeaderCol(header, keywords) {
+  const normalized = header.map(normalizeHeaderCell);
+  return normalized.findIndex(cell => keywords.some(keyword => cell.indexOf(keyword) !== -1));
+}
+
 function findHeaderIndex(values) {
   for (let i = 0; i < Math.min(15, values.length); i++) {
     if (values[i].some(cell => cell.toString().indexOf('低強度') !== -1)) {
@@ -125,19 +134,22 @@ function findHeaderIndex(values) {
 function getColumns(header) {
   const columns = {
     dateCol: 0,
-    jogCol: header.findIndex(cell => cell.toString().indexOf('低強度') !== -1),
-    mltCol: header.findIndex(cell => cell.toString().indexOf('中強度') !== -1),
-    cvCol: header.findIndex(cell => cell.toString().indexOf('高強度') !== -1),
-    speedCol: header.findIndex(cell => cell.toString().indexOf('解糖系') !== -1),
-    stridesCol: header.findIndex(cell => cell.toString().indexOf('流し') !== -1),
-    reinforceCol: header.findIndex(cell => cell.toString().indexOf('補強') !== -1),
-    commentCol: header.findIndex(cell => cell.toString().indexOf('感想') !== -1),
-    resultCol: header.findIndex(cell => cell.toString().indexOf('結果') !== -1)
+    jogCol: findHeaderCol(header, ['低強度']),
+    mltCol: findHeaderCol(header, ['中強度']),
+    cvCol: findHeaderCol(header, ['高強度']),
+    speedCol: findHeaderCol(header, ['解糖系']),
+    stridesCol: findHeaderCol(header, ['流し']),
+    reinforceCol: findHeaderCol(header, ['補強']),
+    commentCol: findHeaderCol(header, ['感想', 'コメント', '反省', '状態']),
+    resultCol: findHeaderCol(header, ['結果', 'ペース'])
   };
-  columns.totalCol = header.findIndex(cell => cell.toString().indexOf('実際の距離') !== -1);
+
+  columns.totalCol = findHeaderCol(header, ['実際の距離']);
   if (columns.totalCol === -1) {
-    columns.totalCol = header.findIndex(cell => cell.toString().trim() === '距離');
+    const normalized = header.map(normalizeHeaderCell);
+    columns.totalCol = normalized.findIndex(cell => cell === '距離');
   }
+
   return columns;
 }
 
@@ -544,9 +556,13 @@ function togglePracticeReaction(data) {
   return { success: true, action: 'added', targetKey, type };
 }
 
+function getCommentColumn(header) {
+  return findHeaderCol(header, ['感想', 'コメント', '反省', '状態']);
+}
+
 function readPracticeReplies(row, header) {
   const replies = [];
-  const commentCol = header.findIndex(cell => cell.toString().indexOf('感想') !== -1);
+  const commentCol = getCommentColumn(header);
   const startCol = commentCol !== -1 ? commentCol + 1 : header.length;
 
   for (let col = startCol; col < row.length; col++) {
@@ -560,7 +576,7 @@ function readPracticeReplies(row, header) {
 }
 
 function findNextReplyColumn(sheet, row, header) {
-  const commentCol = header.findIndex(cell => cell.toString().indexOf('感想') !== -1);
+  const commentCol = getCommentColumn(header);
   const startCol = commentCol !== -1 ? commentCol + 1 : header.length;
   let rightmostReplyCol = startCol - 1;
 
