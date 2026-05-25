@@ -92,6 +92,26 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
   const cacheKeyFor = useCallback((member, dateStr) => `${member}__${dateStr}`, []);
 
+  useEffect(() => {
+    if (!isOpen || !memberName) return;
+    const nextCache = {};
+    Object.entries(cacheRef.current).forEach(([key, value]) => {
+      if (!key.startsWith(`${memberName}__`)) {
+        nextCache[key] = value;
+      }
+    });
+    cacheRef.current = nextCache;
+    setRecordCache((prev) => {
+      const next = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (!key.startsWith(`${memberName}__`)) {
+          next[key] = value;
+        }
+      });
+      return next;
+    });
+  }, [isOpen, memberName]);
+
   const clearForm = useCallback(() => {
     setResult('');
     setJog('');

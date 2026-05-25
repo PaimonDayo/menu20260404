@@ -632,8 +632,8 @@ export async function fetchMemberDayRecord(memberName, date) {
     return null;
   }
 
-  const url = `${GAS_API_URL}?action=getRecord&memberName=${encodeURIComponent(memberName)}&date=${encodeURIComponent(date)}`;
-  const res = await fetch(url);
+  const url = `${GAS_API_URL}?action=getRecord&memberName=${encodeURIComponent(memberName)}&date=${encodeURIComponent(date)}&t=${Date.now()}`;
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) {
     throw new Error(`既存データの取得に失敗しました (${res.status})`);
   }
