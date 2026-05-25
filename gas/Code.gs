@@ -546,16 +546,12 @@ function togglePracticeReaction(data) {
 
 function readPracticeReplies(row, header) {
   const replies = [];
-  let lastStructuralCol = -1;
+  const commentCol = header.findIndex(cell => cell.toString().indexOf('感想') !== -1);
+  const startCol = commentCol !== -1 ? commentCol + 1 : header.length;
 
-  for (let col = header.length - 1; col >= 0; col--) {
-    if ((header[col] || '').toString().trim() !== '') {
-      lastStructuralCol = col;
-      break;
-    }
-  }
-
-  for (let col = lastStructuralCol + 1; col < row.length; col++) {
+  for (let col = startCol; col < row.length; col++) {
+    const headerText = (header[col] || '').toString().trim();
+    if (headerText) continue;
     const text = row[col] ? row[col].toString().trim() : '';
     if (text) replies.push(text);
   }
@@ -564,25 +560,26 @@ function readPracticeReplies(row, header) {
 }
 
 function findNextReplyColumn(sheet, row, header) {
-  let lastStructuralCol = -1;
+  const commentCol = header.findIndex(cell => cell.toString().indexOf('感想') !== -1);
+  const startCol = commentCol !== -1 ? commentCol + 1 : header.length;
+  let rightmostReplyCol = startCol - 1;
 
-  for (let col = header.length - 1; col >= 0; col--) {
-    if ((header[col] || '').toString().trim() !== '') {
-      lastStructuralCol = col;
-      break;
-    }
-  }
-
-  let rightmostReplyCol = lastStructuralCol;
-  for (let col = lastStructuralCol + 1; col < row.length; col++) {
+  for (let col = startCol; col < sheet.getMaxColumns(); col++) {
+    const headerText = (header[col] || '').toString().trim();
+    if (headerText) continue;
     if ((row[col] || '').toString().trim() !== '') {
       rightmostReplyCol = col;
     }
   }
 
-  const nextCol = rightmostReplyCol + 1;
+  let nextCol = rightmostReplyCol + 1;
+  while (nextCol < sheet.getMaxColumns() && (header[nextCol] || '').toString().trim() !== '') {
+    nextCol += 1;
+  }
+
   if (nextCol >= sheet.getMaxColumns()) {
     sheet.insertColumnAfter(sheet.getMaxColumns());
+    return sheet.getMaxColumns();
   }
   return nextCol;
 }

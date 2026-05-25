@@ -460,17 +460,11 @@ export async function fetchMemberPracticeData(gid, timestamp) {
   }
 
   const getReplies = (row) => {
-    let lastStructuralCol = -1;
-    for (let col = header.length - 1; col >= 0; col--) {
-      if ((header[col] ?? '').trim() !== '') {
-        lastStructuralCol = col;
-        break;
-      }
-    }
-    if (lastStructuralCol === -1) lastStructuralCol = commentCol;
-
     const replies = [];
-    for (let col = lastStructuralCol + 1; col < Math.max(header.length, row.length); col++) {
+    const startCol = commentCol !== -1 ? commentCol + 1 : header.length;
+    for (let col = startCol; col < Math.max(header.length, row.length); col++) {
+      const headerText = (header[col] ?? '').trim();
+      if (headerText) continue;
       const text = row[col]?.trim() ?? '';
       if (text) replies.push(text);
     }
