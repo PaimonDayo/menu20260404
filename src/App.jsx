@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
   MapPin, Clock, ListChecks, Timer, StickyNote,
-  ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Users, Footprints, CalendarDays as CalendarIcon
+  ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Heart, Plus, Footprints, CalendarDays as CalendarIcon
 } from 'lucide-react';
 import { months, practiceData as mockData, mockScheduleData, locationStyles, defaultLocationStyle, locationDetails } from './data/mockData';
 import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, hasConfig } from './services/sheetsService';
@@ -337,9 +337,8 @@ export default function App() {
      const [showLocations, setShowLocations] = useState(false);
      const [scheduleCategory, setScheduleCategory] = useState('大会・行事'); // 大会・行事, 記録会
      
-     // 📱 新マルチタブ用の状態変数
-     const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'social' | 'analytics'
-     const [socialSection, setSocialSection] = useState('recent'); // 'recent' | 'ranking'
+     // 📱 4タブ構成の状態変数
+     const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'feed' | 'ranking' | 'analytics'
      const [socialResetKey, setSocialResetKey] = useState(0);
      const [myPageResetKey, setMyPageResetKey] = useState(0);
      const [showInputDrawer, setShowInputDrawer] = useState(false);
@@ -876,30 +875,37 @@ export default function App() {
           </div>
         )}
 
-        {/* 🏆 Tab 2: ランキング */}
-        {activeTab === 'social' && (
+        {/* ❤️ Tab 2: フィード（最近の記録） */}
+        {activeTab === 'feed' && (
           <Suspense fallback={<TabLoadingFallback />}>
             <StatsDashboard
-              showSection={socialSection}
-              socialSection={socialSection}
-              setSocialSection={setSocialSection}
+              showSection="recent"
               selectedMember={selectedMember}
               setSelectedMember={setSelectedMember}
-              setActiveTab={setActiveTab}
               resetSignal={socialResetKey}
             />
           </Suspense>
         )}
 
-        {/* 📊 Tab 3: 個人分析 */}
+        {/* 🏆 Tab 3: ランキング */}
+        {activeTab === 'ranking' && (
+          <Suspense fallback={<TabLoadingFallback />}>
+            <StatsDashboard
+              showSection="ranking"
+              selectedMember={selectedMember}
+              setSelectedMember={setSelectedMember}
+              resetSignal={socialResetKey}
+            />
+          </Suspense>
+        )}
+
+        {/* 📊 Tab 4: マイページ */}
         {activeTab === 'analytics' && (
           <Suspense fallback={<TabLoadingFallback />}>
             <StatsDashboard
               showSection="analytics"
               selectedMember={selectedMember}
               setSelectedMember={setSelectedMember}
-              setActiveTab={setActiveTab}
-              onOpenInputDrawer={() => setShowInputDrawer(true)}
               resetSignal={myPageResetKey}
             />
           </Suspense>
@@ -923,69 +929,61 @@ export default function App() {
         </div>
       )}
 
-      {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}
-      <nav
-        className="fixed inset-x-4 z-40 rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] flex justify-around items-center max-w-md mx-auto"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
-      >
-        
-        {/* ボタン: 予定 */}
+      {/* ── ➕ 記録入力FAB（Twitter方式: タブバーの少し上・右下） ── */}
+      {!showInputDrawer && (
         <button
           onClick={() => {
-            if (activeTab === 'schedule') {
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            } else {
-              setActiveTab('schedule');
-            }
-          }}
-          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
-            activeTab === 'schedule' 
-              ? 'text-blue-600 font-extrabold scale-105' 
-              : 'text-slate-400 active:text-slate-600'
-          }`}
-        >
-          <CalendarDays size={18} className={activeTab === 'schedule' ? 'text-blue-600' : ''} />
-          <span className="text-[9px] tracking-wide font-black">予定</span>
-        </button>
-
-        {/* ボタン: ランキング */}
-        <button
-          onClick={() => {
-            if (activeTab === 'social') {
-              setSocialResetKey((prev) => prev + 1);
-            } else {
-              setActiveTab('social');
-            }
-          }}
-          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
-            activeTab === 'social' 
-              ? 'text-blue-600 font-extrabold scale-105' 
-              : 'text-slate-400 active:text-slate-600'
-          }`}
-        >
-          <Users size={18} className={activeTab === 'social' ? 'text-blue-600' : ''} />
-          <span className="text-[9px] tracking-wide font-black">ソーシャル</span>
-        </button>
-
-        {/* ボタン: 個人分析 */}
-        <button
-          onClick={() => {
-            if (activeTab === 'analytics') {
-              setMyPageResetKey((prev) => prev + 1);
+            if (selectedMember) {
+              setShowInputDrawer(true);
             } else {
               setActiveTab('analytics');
+              showToast('マイページで部員を選択してください');
             }
           }}
-          className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
-            activeTab === 'analytics' 
-              ? 'text-emerald-600 font-extrabold scale-105' 
-              : 'text-slate-400 active:text-slate-600'
-          }`}
+          aria-label="記録を入力"
+          className="fixed right-4 z-40 w-14 h-14 rounded-full bg-[#007aff] text-white flex items-center justify-center shadow-[0_8px_20px_rgba(0,122,255,0.35)] active:scale-95 transition-all"
+          style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)' }}
         >
-          <User size={18} className={activeTab === 'analytics' ? 'text-emerald-600' : ''} />
-          <span className="text-[9px] tracking-wide font-black">マイページ</span>
+          <Plus size={26} strokeWidth={2.2} />
         </button>
+      )}
 
+      {/* ── 📱 4タブ ボトムナビゲーション ── */}
+      <nav
+        className="fixed inset-x-4 z-40 rounded-3xl bg-white/92 backdrop-blur-xl border border-zinc-200/70 px-1 py-2 shadow-[0_-4px_20px_rgba(0,0,0,0.04)] flex justify-around items-center max-w-md mx-auto"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
+        {[
+          { key: 'schedule', label: '予定', icon: CalendarDays },
+          { key: 'feed', label: 'フィード', icon: Heart },
+          { key: 'ranking', label: 'ランキング', icon: Trophy },
+          { key: 'analytics', label: 'マイページ', icon: User },
+        ].map(tab => {
+          const Icon = tab.icon;
+          const active = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => {
+                if (!active) {
+                  setActiveTab(tab.key);
+                } else if (tab.key === 'schedule') {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else if (tab.key === 'analytics') {
+                  setMyPageResetKey(prev => prev + 1);
+                } else {
+                  setSocialResetKey(prev => prev + 1);
+                }
+              }}
+              className={`flex flex-col items-center gap-0.5 flex-1 py-1 transition-colors ${
+                active ? 'text-[#007aff]' : 'text-zinc-400 active:text-zinc-600'
+              }`}
+            >
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+              <span className={`text-[10px] ${active ? 'font-semibold' : 'font-medium'}`}>{tab.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
     </div>

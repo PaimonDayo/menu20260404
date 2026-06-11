@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send, Heart } from 'lucide-react';
+import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, Check, ChevronDown, ChevronsUpDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send, Heart } from 'lucide-react';
 import { fetchAllMembersStats, fetchSocialData, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply, fetchRecordReactions, toggleRecordReaction, getReactionActorId } from '../services/sheetsService';
 
 // 強度別のプレミアム・パステルカラー設定 (スプレッドシート準拠の配色)
@@ -209,14 +209,11 @@ const getRankingTicks = (limit) => {
   return [0, Math.round(limit / 2), limit];
 };
 
-export default function StatsDashboard({ 
-  showSection = 'ranking', 
-  socialSection = 'recent',
-  setSocialSection = () => {},
+export default function StatsDashboard({
+  showSection = 'ranking',
   onDataLoaded = null,
   selectedMember = '',
   setSelectedMember = () => {},
-  onOpenInputDrawer = null,
   resetSignal = 0
 }) {
   const [period, setPeriod] = useState('month'); // 'week' | 'month' | 'lastMonth' | 'total'
@@ -1457,33 +1454,6 @@ export default function StatsDashboard({
 
   return (
     <div className="animate-fade-in pb-8">
-      {(showSection === 'recent' || showSection === 'ranking') && !rankingDetailMember && (
-        <div className="mb-3 bg-slate-100/70 p-0.5 rounded-2xl flex w-full border border-slate-100">
-          {[
-            { key: 'recent', label: '最近', icon: Activity },
-            { key: 'ranking', label: 'ランキング', icon: Trophy },
-          ].map(item => {
-            const Icon = item.icon;
-            const active = socialSection === item.key;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setSocialSection(item.key)}
-                className={`flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-black transition-all ${
-                  active
-                    ? 'bg-white text-[#007aff] shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
-                    : 'text-slate-400 active:text-slate-600'
-                }`}
-              >
-                <Icon size={15} />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {showSection === 'recent' && !rankingDetailMember && (
         <div className="space-y-4">
           <div className="ios-card rounded-[28px] p-4 space-y-4">
@@ -2189,41 +2159,19 @@ export default function StatsDashboard({
       {showSection === 'analytics' && (
         <div className="space-y-4">
           
-          {/* iOS風メンバー選択トリガーの粘着コンテナ (ヘッダーとの美しい隙間を保ちつつ、スクロールコンテンツを下に綺麗に潜り込ませる) */}
+          {/* メンバー表示行（iOS設定アプリ風: 行全体タップで人選択シートが開く。記録入力はFABに移管） */}
           <div className="sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-20 bg-[#f8fafc] pt-2.5 pb-1">
-            <div className="bg-white border border-slate-100 rounded-3xl p-3.5 shadow-[0_8px_30px_rgba(0,0,0,0.015)] flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500 font-black">
-                  <User size={18} />
-                </div>
-                <div>
-                  <span className="text-[9px] font-bold text-slate-400 block leading-none">マイページ</span>
-                  <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{selectedMember ? formatMemberName(selectedMember) : '部員を選択'}</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                {onOpenInputDrawer && selectedMember && (
-                  <button
-                    onClick={onOpenInputDrawer}
-                    aria-label="記録を入力"
-                    title="記録を入力"
-                    className="flex items-center gap-1 bg-emerald-50 border border-emerald-100 text-emerald-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
-                  >
-                    <Activity size={13} />
-                    <span className="hidden sm:inline">記録</span>
-                  </button>
-                )}
-                <button
-                  onClick={() => setShowMemberSheet(true)}
-                  aria-label="メンバーを切り替え"
-                  title="メンバーを切り替え"
-                  className="flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-600 px-3.5 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
-                >
-                  <Users size={14} />
-                </button>
-              </div>
-            </div>
+            <button
+              onClick={() => setShowMemberSheet(true)}
+              aria-label="メンバーを切り替え"
+              className="w-full bg-white rounded-2xl px-4 py-3 flex items-center justify-between active:bg-zinc-50 transition-colors shadow-[0_2px_12px_rgba(0,0,0,0.02)]"
+            >
+              <span className="text-[15px] text-zinc-500">メンバー</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-[16px] font-semibold text-zinc-900">{selectedMember ? formatMemberName(selectedMember) : '部員を選択'}</span>
+                <ChevronsUpDown size={15} className="text-zinc-400" />
+              </span>
+            </button>
           </div>
 
           {!selectedMemberData ? (
@@ -2652,7 +2600,7 @@ export default function StatsDashboard({
           
           {/* シート本体 */}
           <div 
-            className={`fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-white rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden pb-safe ${
+            className={`fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-[#f2f2f7] rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden pb-safe ${
               isClosing ? '' : 'animate-slide-up md:animate-fade-in'
             }`}
             style={{
@@ -2679,39 +2627,28 @@ export default function StatsDashboard({
               onTouchEnd={handleTouchEnd}
             >
               <div>
-                <h3 className="text-base font-black text-slate-800">部員を選択</h3>
+                <h3 className="text-[17px] font-semibold text-zinc-900">部員を選択</h3>
               </div>
-              <button 
+              <button
                 onClick={closeMemberSheet}
-                className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 active:scale-95 transition-all shadow-sm"
+                aria-label="閉じる"
+                className="w-7 h-7 rounded-full bg-zinc-200/70 flex items-center justify-center text-zinc-500 active:scale-95 transition-all"
               >
-                <X size={15} />
+                <X size={14} />
               </button>
             </div>
 
             {/* 学年別フィルターチップス (モーダル用、横スクロール) */}
-            <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap px-5 py-2.5 scrollbar-none border-b border-slate-50 bg-slate-50/30 shrink-0">
-              <button
-                onClick={() => setModalGrade('')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
-                  modalGrade === ''
-                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm font-black'
-                    : 'bg-white border-slate-100/80 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                すべて
-              </button>
-              {gradeList.map(g => (
+            <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap px-5 py-2.5 scrollbar-none shrink-0">
+              {['', ...gradeList].map(g => (
                 <button
-                  key={g}
+                  key={g || 'all'}
                   onClick={() => setModalGrade(g)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
-                    modalGrade === g
-                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm font-black'
-                      : 'bg-white border-slate-100/80 text-slate-500 hover:bg-slate-50'
+                  className={`shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-medium transition-all active:scale-95 ${
+                    modalGrade === g ? 'bg-[#007aff] text-white' : 'bg-zinc-200/55 text-zinc-600'
                   }`}
                 >
-                  {g}
+                  {g || 'すべて'}
                 </button>
               ))}
             </div>
@@ -2744,23 +2681,15 @@ export default function StatsDashboard({
                         }
                         closeMemberSheet();
                       }}
-                      className={`flex items-center gap-2.5 p-3.5 rounded-2xl border text-left transition-all ${
-                        isSelected 
-                          ? 'bg-blue-50 border-blue-200 text-blue-600 font-extrabold shadow-sm active:scale-98'
-                          : 'bg-slate-50/50 border-slate-100 text-slate-600 hover:bg-slate-50 active:scale-98 active:bg-slate-100/50'
+                      className={`flex items-center justify-between px-3.5 py-3 rounded-2xl text-left transition-all active:scale-[0.98] ${
+                        isSelected ? 'bg-[#007aff]/10 text-[#007aff]' : 'bg-white text-zinc-900'
                       }`}
                     >
-                      {/* アバター文字 */}
-                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${
-                        isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'
-                      }`}>
-                        {nameOnly.substring(0, 2)}
-                      </div>
-                      
                       <div className="truncate min-w-0">
-                        <span className="text-[8px] block text-slate-400 font-extrabold leading-none uppercase tracking-wider">{grade}</span>
-                        <span className="text-xs font-black block mt-1 truncate">{nameOnly}</span>
+                        <span className="text-[11px] text-zinc-400 block leading-none">{grade}</span>
+                        <span className={`text-[14px] block mt-1 truncate ${isSelected ? 'font-semibold' : ''}`}>{nameOnly}</span>
                       </div>
+                      {isSelected && <Check size={16} strokeWidth={2.5} className="shrink-0" />}
                     </button>
                   );
                 });

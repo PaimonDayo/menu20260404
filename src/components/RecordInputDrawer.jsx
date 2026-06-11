@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Calculator, Loader2, Send, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { fetchMemberDayRecord, submitPracticeRecord } from '../services/sheetsService';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -65,6 +65,14 @@ const mergeRecordResponse = (cached, remote) => {
   return { ...remote, data };
 };
 
+// 強度ドットの色（マイページの強度別グラフと同じ系統色）
+const INTENSITY_DOTS = {
+  jog: '#007aff',
+  mlt: '#34c759',
+  cv: '#ffcc00',
+  speed: '#ff9500',
+};
+
 export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecordSubmitted }) {
   const [date, setDate] = useState(getTodayIso);
   const [result, setResult] = useState('');
@@ -76,6 +84,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   const [reinforce, setReinforce] = useState('');
   const [comment, setComment] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [hasExisting, setHasExisting] = useState(false); // 選択日に既存記録があるか（編集バッジ用）
 
   const todayIso = useMemo(() => getTodayIso(), []);
   const minIso = useMemo(() => addDays(todayIso, -29), [todayIso]);
@@ -132,6 +141,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
     setStrides('');
     setReinforce('');
     setComment('');
+    setHasExisting(false);
   }, []);
 
   const applyRecord = useCallback((res) => {
@@ -145,6 +155,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       setStrides(data.strides ? String(data.strides) : '');
       setReinforce(data.reinforce || '');
       setComment(data.comment || '');
+      setHasExisting(true);
       return;
     }
     clearForm();
@@ -250,41 +261,48 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   if (!isOpen) return null;
 
   const calculatedTotal = totalDistance();
+  const distanceFields = [
+    { key: 'jog', label: '低強度 (jog)', value: jog, set: setJog },
+    { key: 'mlt', label: '中強度 (M-LT)', value: mlt, set: setMlt },
+    { key: 'cv', label: '高強度 (CV-VO2)', value: cv, set: setCv },
+    { key: 'speed', label: '解糖系 (スピード)', value: speed, set: setSpeed },
+  ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm animate-fade-in">
-      <button type="button" className="absolute inset-0 cursor-default" onClick={requestClose} aria-label="閉じる" />
+    <div className="fixed inset-0 z-50 bg-[#f2f2f7] animate-slide-up">
+      <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
 
-      <div className="w-full max-w-md bg-white rounded-t-[34px] shadow-[0_-18px_48px_rgba(0,0,0,0.14)] animate-slide-up border-t border-white z-10 max-h-[92vh] overflow-hidden">
-        <div className="max-h-[92vh] overflow-y-auto px-5 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
-          <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4" />
-
-          <div className="flex justify-between items-start mb-5">
-            <div className="min-w-0 pr-4">
-              <h3 className="text-base font-extrabold text-slate-900 truncate">{memberName} の練習記録</h3>
+        {/* ── 上部バー（キャンセル / タイトル / 保存）── */}
+        <div className="shrink-0 bg-[#f2f2f7]/95 backdrop-blur border-b border-zinc-200/60 pt-[calc(env(safe-area-inset-top,0px)+6px)]">
+          <div className="max-w-md mx-auto w-full">
+            <div className="flex items-center justify-between px-4 py-3 gap-3">
+              <button
+                type="button"
+                onClick={requestClose}
+                className="text-[16px] text-[#007aff] active:opacity-60 transition-opacity shrink-0"
+              >
+                キャンセル
+              </button>
+              <span className="flex items-center gap-1.5 min-w-0">
+                <span className="text-[16px] font-semibold text-zinc-900 truncate">{memberName}</span>
+                {hasExisting && (
+                  <span className="text-[11px] font-medium text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded-md shrink-0">編集</span>
+                )}
+              </span>
+              <button
+                type="submit"
+                className="text-[16px] font-semibold text-[#007aff] active:opacity-60 transition-opacity shrink-0"
+              >
+                保存
+              </button>
             </div>
-            <button
-              onClick={requestClose}
-              className="w-8 h-8 rounded-full bg-[#f2f2f7] flex items-center justify-center text-zinc-400 hover:text-zinc-700 active:scale-95 transition-all shrink-0"
-              aria-label="閉じる"
-              type="button"
-            >
-              <X size={15} />
-            </button>
-          </div>
 
-          <div className="pb-4 border-b border-slate-100">
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">日付</span>
-                <div className="flex items-end gap-2 mt-1">
-                  <span className="text-3xl font-black leading-none text-slate-900">{selectedDate.day}</span>
-                  <span className="text-xs font-extrabold text-slate-400 pb-0.5">{selectedDate.month}月 / {selectedDate.weekday}</span>
-                </div>
-              </div>
-              <div className="h-7 flex items-center gap-2">
+            {/* 日付情報行 */}
+            <div className="flex items-center justify-between px-4 pb-1.5">
+              <span className="text-[13px] text-zinc-500">{selectedDate.full}</span>
+              <span className="flex items-center gap-2 h-6">
                 {syncing && (
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                  <span className="inline-flex items-center gap-1 text-[12px] text-zinc-400">
                     <Loader2 size={12} className="animate-spin" />
                     同期中
                   </span>
@@ -293,16 +311,17 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                   <button
                     type="button"
                     onClick={() => requestDateChange(todayIso)}
-                    className="h-7 px-3 rounded-full bg-[#f2f2f7] text-[#007aff] text-[10px] font-black active:scale-95 transition-all"
+                    className="h-6 px-2.5 rounded-full bg-zinc-200/55 text-[#007aff] text-[12px] font-medium active:scale-95 transition-all"
                   >
                     今日
                   </button>
                 )}
-              </div>
+              </span>
             </div>
 
-            <div ref={railRef} className="overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory -mx-5 px-5">
-              <div className="flex gap-1.5 min-w-max">
+            {/* 日付レール */}
+            <div ref={railRef} className="overflow-x-auto scrollbar-none scroll-smooth snap-x snap-mandatory px-4 pb-2.5">
+              <div className="flex gap-1 min-w-max">
                 {recentDates.map((item) => {
                   const isActive = date === item.dateStr;
                   const isToday = item.dateStr === todayIso;
@@ -312,86 +331,109 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                       data-date={item.dateStr}
                       type="button"
                       onClick={() => requestDateChange(item.dateStr)}
-                      className={`snap-center shrink-0 w-[52px] h-[64px] rounded-[20px] flex flex-col items-center justify-center transition-all active:scale-95 ${
-                        isActive ? 'bg-[#007aff] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-[#f2f2f7]'
+                      className={`snap-center shrink-0 w-[46px] py-1.5 rounded-xl flex flex-col items-center transition-all active:scale-95 ${
+                        isActive ? 'bg-[#007aff] text-white' : 'text-zinc-500'
                       }`}
                     >
-                      <span className={`text-[9px] font-black leading-none ${isActive ? 'text-white/80' : 'text-slate-400'}`}>{item.caption}</span>
-                      <span className="text-xl font-black leading-none mt-1">{item.day}</span>
-                      <span className={`w-1 h-1 rounded-full mt-1.5 ${isToday ? (isActive ? 'bg-white' : 'bg-[#007aff]') : 'bg-transparent'}`} />
+                      <span className={`text-[10px] leading-none ${isActive ? 'text-white/80' : 'text-zinc-400'}`}>{item.caption}</span>
+                      <span className="text-[17px] font-semibold leading-none mt-1">{item.day}</span>
+                      <span className={`w-1 h-1 rounded-full mt-1 ${isToday ? (isActive ? 'bg-white' : 'bg-[#007aff]') : 'bg-transparent'}`} />
                     </button>
                   );
                 })}
               </div>
             </div>
           </div>
-
-          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-            <div className="ios-list">
-              <Field label="結果">
-                <input type="text" placeholder="例: 12000mPR 3'40" value={result} onChange={(e) => update(setResult)(e.target.value)} autoComplete="off" className="ios-input" />
-              </Field>
-
-              <div className="ios-list-row p-3">
-                <label className="ios-label mb-1.5">走行距離 (km)</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <DistanceInput label="低強度 (jog)" color="text-[#007aff]" value={jog} onChange={update(setJog)} />
-                  <DistanceInput label="中強度 (M-LT)" color="text-emerald-500" value={mlt} onChange={update(setMlt)} />
-                  <DistanceInput label="高強度 (CV-VO2)" color="text-amber-500" value={cv} onChange={update(setCv)} />
-                  <DistanceInput label="解糖系 (スピード)" color="text-orange-500" value={speed} onChange={update(setSpeed)} />
-                </div>
-              </div>
-
-              <div className="ios-list-row p-3 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="ios-label mb-1">流し</label>
-                  <input type="number" inputMode="numeric" min="0" placeholder="例: 3" value={strides} onChange={(e) => update(setStrides)(e.target.value)} autoComplete="off" className="ios-input !py-2.5 !rounded-xl" />
-                </div>
-                <div className="flex flex-col justify-end">
-                  <span className="ios-label mb-1">自動合計</span>
-                  <div className="px-4 py-2.5 bg-[#f2f2f7] rounded-xl text-xs font-extrabold text-zinc-600 flex items-center justify-between">
-                    <span>{calculatedTotal} km</span>
-                    <Calculator size={12} className="text-zinc-400" />
-                  </div>
-                </div>
-              </div>
-
-              <Field label="補強">
-                <input type="text" placeholder="例: 腹筋200, スクワット50" value={reinforce} onChange={(e) => update(setReinforce)(e.target.value)} autoComplete="off" className="ios-input" />
-              </Field>
-
-              <Field label="感想">
-                <textarea placeholder="今日の感想、状態、反省など" value={comment} onChange={(e) => update(setComment)(e.target.value)} autoComplete="off" className="ios-input h-32 min-h-32 resize-y text-sm leading-relaxed" />
-              </Field>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button type="submit" className="h-12 min-w-0 flex-1 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)] overflow-hidden">
-                <Send size={12} className="shrink-0" />
-                <span className="whitespace-nowrap">保存</span>
-              </button>
-            </div>
-          </form>
         </div>
-      </div>
-    </div>
-  );
-}
 
-function Field({ label, children }) {
-  return (
-    <div className="ios-list-row p-3">
-      <label className="ios-label mb-1">{label}</label>
-      {children}
-    </div>
-  );
-}
+        {/* ── フィールド（スクロール領域）── */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-md mx-auto w-full px-4 py-3 space-y-3 pb-[calc(env(safe-area-inset-bottom,0px)+24px)]">
 
-function DistanceInput({ label, color, value, onChange }) {
-  return (
-    <div>
-      <span className={`text-[9px] font-extrabold ${color} block mb-0.5`}>{label}</span>
-      <input type="number" inputMode="decimal" step="0.1" min="0" placeholder="0.0" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="off" className="ios-input !px-3 !py-2.5 !rounded-xl" />
+            {/* 走行距離 + 合計 */}
+            <div className="bg-white rounded-2xl p-3.5">
+              <p className="text-[13px] font-medium text-zinc-500 mb-2.5">走行距離 (km)</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {distanceFields.map((f) => (
+                  <div key={f.key}>
+                    <span className="flex items-center gap-1.5 text-[12px] text-zinc-500 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: INTENSITY_DOTS[f.key] }} />
+                      {f.label}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      min="0"
+                      placeholder="0.0"
+                      value={f.value}
+                      onChange={(e) => update(f.set)(e.target.value)}
+                      autoComplete="off"
+                      className="w-full bg-[#f2f2f7] rounded-xl px-3 py-2.5 text-[15px] font-semibold text-zinc-900 outline-none focus:ring-2 focus:ring-[#007aff]/25"
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-zinc-100">
+                <span className="text-[13px] text-zinc-500">合計</span>
+                <span className="text-[17px] font-semibold text-zinc-900">{calculatedTotal} km</span>
+              </div>
+            </div>
+
+            {/* 流し */}
+            <div className="bg-white rounded-2xl px-4 py-3 flex items-center justify-between">
+              <span className="text-[15px] text-zinc-900">流し</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="0"
+                value={strides}
+                onChange={(e) => update(setStrides)(e.target.value)}
+                autoComplete="off"
+                className="w-24 bg-[#f2f2f7] rounded-lg px-3 py-1.5 text-[15px] font-semibold text-right text-zinc-900 outline-none focus:ring-2 focus:ring-[#007aff]/25"
+              />
+            </div>
+
+            {/* 結果・補強・感想 */}
+            <div className="bg-white rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-zinc-100">
+                <span className="text-[12px] text-zinc-400 block mb-0.5">結果・タイム</span>
+                <input
+                  type="text"
+                  placeholder="例: 12000mPR 3'40"
+                  value={result}
+                  onChange={(e) => update(setResult)(e.target.value)}
+                  autoComplete="off"
+                  className="w-full bg-transparent text-[15px] text-zinc-900 outline-none placeholder:text-zinc-300"
+                />
+              </div>
+              <div className="px-4 py-3 border-b border-zinc-100">
+                <span className="text-[12px] text-zinc-400 block mb-0.5">補強</span>
+                <input
+                  type="text"
+                  placeholder="例: 腹筋200, スクワット50"
+                  value={reinforce}
+                  onChange={(e) => update(setReinforce)(e.target.value)}
+                  autoComplete="off"
+                  className="w-full bg-transparent text-[15px] text-zinc-900 outline-none placeholder:text-zinc-300"
+                />
+              </div>
+              <div className="px-4 py-3">
+                <span className="text-[12px] text-zinc-400 block mb-0.5">感想</span>
+                <textarea
+                  placeholder="今日の感想、状態、反省など"
+                  value={comment}
+                  onChange={(e) => update(setComment)(e.target.value)}
+                  autoComplete="off"
+                  className="w-full bg-transparent text-[15px] text-zinc-900 outline-none placeholder:text-zinc-300 resize-y h-28 leading-relaxed"
+                />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </form>
     </div>
   );
 }
