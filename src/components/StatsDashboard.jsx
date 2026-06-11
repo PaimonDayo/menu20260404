@@ -233,9 +233,22 @@ export default function StatsDashboard({
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replySubmittingKey, setReplySubmittingKey] = useState('');
   const [expandedFeedbackKeys, setExpandedFeedbackKeys] = useState({});
-  const [reactions, setReactions] = useState([]);
+  // キャッシュ先行表示: 前回取得分を即表示し、裏で最新を取得する
+  const [reactions, setReactions] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('tf_reactions_cache_v1'));
+      if (Array.isArray(cached)) return cached;
+    } catch { /* キャッシュ破損時は無視 */ }
+    return [];
+  });
   const [reactionSubmittingKey, setReactionSubmittingKey] = useState('');
-  const [latestRecords, setLatestRecords] = useState(null);
+  const [latestRecords, setLatestRecords] = useState(() => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('tf_latest_records_cache_v1'));
+      if (Array.isArray(cached)) return cached;
+    } catch { /* キャッシュ破損時は無視 */ }
+    return null;
+  });
   const reactionActorId = useMemo(() => getReactionActorId(), []);
 
   useEffect(() => {
@@ -268,6 +281,9 @@ export default function StatsDashboard({
     fetchRecordReactions()
       .then(rows => {
         if (mounted) setReactions(rows);
+        try {
+          localStorage.setItem('tf_reactions_cache_v1', JSON.stringify(rows));
+        } catch { /* 容量超過時は無視 */ }
       })
       .catch(err => {
         console.warn('リアクションの取得に失敗しました:', err);
@@ -283,8 +299,11 @@ export default function StatsDashboard({
     let mounted = true;
     fetchLatestRecords({ limit: 100 })
       .then(records => {
-        if (mounted && Array.isArray(records)) {
-          setLatestRecords(records);
+        if (Array.isArray(records)) {
+          if (mounted) setLatestRecords(records);
+          try {
+            localStorage.setItem('tf_latest_records_cache_v1', JSON.stringify(records));
+          } catch { /* 容量超過時は無視 */ }
         }
       })
       .catch(err => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from 'react';
 import {
   MapPin, Clock, ListChecks, Timer, StickyNote,
   ChevronDown, ChevronUp, CalendarDays, Trophy, Map, ExternalLink, RefreshCcw, User, Users, Footprints, CalendarDays as CalendarIcon
@@ -7,7 +7,8 @@ import { months, practiceData as mockData, mockScheduleData, locationStyles, def
 import { fetchPracticeData, fetchScheduleData, getEntryPeriodStatus, hasConfig } from './services/sheetsService';
 import CalendarModal from './components/CalendarModal';
 import LocationsModal from './components/LocationsModal';
-import StatsDashboard from './components/StatsDashboard';
+// 最大のコンポーネントなので遅延読み込みし、予定タブの初期表示を軽くする
+const StatsDashboard = lazy(() => import('./components/StatsDashboard'));
 import RecordInputDrawer from './components/RecordInputDrawer';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -281,6 +282,17 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Tab loading fallback ─────────────────────────────────────────────────────
+
+function TabLoadingFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+      <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+      <p className="text-xs font-bold">読み込み中...</p>
     </div>
   );
 }
@@ -688,7 +700,10 @@ export default function App() {
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
-                    {m === '日程一覧' ? '🏆 日程一覧' : `📅 ${m}`}
+                    <span className="inline-flex items-center justify-center gap-1">
+                      {m === '日程一覧' ? <Trophy size={12} className="shrink-0" /> : <CalendarDays size={12} className="shrink-0" />}
+                      {m}
+                    </span>
                   </button>
                 );
               })}
@@ -847,27 +862,31 @@ export default function App() {
 
         {/* 🏆 Tab 2: ランキング */}
         {activeTab === 'social' && (
-          <StatsDashboard 
-            showSection={socialSection} 
-            socialSection={socialSection}
-            setSocialSection={setSocialSection}
-            selectedMember={selectedMember}
-            setSelectedMember={setSelectedMember}
-            setActiveTab={setActiveTab}
-            resetSignal={socialResetKey}
-          />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <StatsDashboard
+              showSection={socialSection}
+              socialSection={socialSection}
+              setSocialSection={setSocialSection}
+              selectedMember={selectedMember}
+              setSelectedMember={setSelectedMember}
+              setActiveTab={setActiveTab}
+              resetSignal={socialResetKey}
+            />
+          </Suspense>
         )}
 
         {/* 📊 Tab 3: 個人分析 */}
         {activeTab === 'analytics' && (
-          <StatsDashboard 
-            showSection="analytics" 
-            selectedMember={selectedMember}
-            setSelectedMember={setSelectedMember}
-            setActiveTab={setActiveTab}
-            onOpenInputDrawer={() => setShowInputDrawer(true)}
-            resetSignal={myPageResetKey}
-          />
+          <Suspense fallback={<TabLoadingFallback />}>
+            <StatsDashboard
+              showSection="analytics"
+              selectedMember={selectedMember}
+              setSelectedMember={setSelectedMember}
+              setActiveTab={setActiveTab}
+              onOpenInputDrawer={() => setShowInputDrawer(true)}
+              resetSignal={myPageResetKey}
+            />
+          </Suspense>
         )}
 
       </main>

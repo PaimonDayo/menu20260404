@@ -85,6 +85,30 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   const selectedDate = useMemo(() => dateParts(date), [date]);
   const railRef = useRef(null);
   const cacheRef = useRef(recordCache);
+  // 未保存の編集があるか。確認なしの破棄や、同期完了時の入力上書きを防ぐ
+  const dirtyRef = useRef(false);
+
+  const update = (setter) => (value) => {
+    dirtyRef.current = true;
+    setter(value);
+  };
+
+  const requestClose = () => {
+    if (dirtyRef.current && !window.confirm('入力中の内容が保存されていません。破棄して閉じますか？')) return;
+    dirtyRef.current = false;
+    onClose();
+  };
+
+  const requestDateChange = (nextDate) => {
+    if (nextDate === date) return;
+    if (dirtyRef.current && !window.confirm('入力中の内容が保存されていません。破棄して日付を変更しますか？')) return;
+    dirtyRef.current = false;
+    setDate(nextDate);
+  };
+
+  useEffect(() => {
+    if (isOpen) dirtyRef.current = false;
+  }, [isOpen]);
 
   useEffect(() => {
     cacheRef.current = recordCache;
@@ -175,12 +199,13 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
         if (mounted) {
           const merged = mergeRecordResponse(cached, res);
           setRecordCache((prev) => ({ ...prev, [key]: merged }));
-          applyRecord(merged);
+          // 同期中にユーザーが入力を始めていたら、取得結果で上書きしない
+          if (!dirtyRef.current) applyRecord(merged);
         }
       })
       .catch((err) => {
         console.warn('既存記録の取得に失敗しました', err);
-        if (mounted && !cached) clearForm();
+        if (mounted && !cached && !dirtyRef.current) clearForm();
       })
       .finally(() => {
         if (mounted) setSyncing(false);
@@ -228,6 +253,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       await submitPracticeRecord(payload);
       setRecordCache((prev) => ({ ...prev, [cacheKeyFor(memberName, date)]: { exists: true, data: payload } }));
       onRecordSubmitted?.(payload);
+      dirtyRef.current = false;
       onClose();
     } catch (err) {
       window.alert(`保存に失敗しました: ${err.message}`);
@@ -242,7 +268,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 backdrop-blur-sm animate-fade-in">
-      <button type="button" className="absolute inset-0 cursor-default" onClick={onClose} aria-label="閉じる" />
+      <button type="button" className="absolute inset-0 cursor-default" onClick={requestClose} aria-label="閉じる" />
 
       <div className="w-full max-w-md bg-white rounded-t-[34px] shadow-[0_-18px_48px_rgba(0,0,0,0.14)] animate-slide-up border-t border-white z-10 max-h-[92vh] overflow-hidden">
         <div className="max-h-[92vh] overflow-y-auto px-5 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+20px)]">
@@ -253,7 +279,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
               <h3 className="text-base font-extrabold text-slate-900 truncate">{memberName} の練習記録</h3>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="w-8 h-8 rounded-full bg-[#f2f2f7] flex items-center justify-center text-zinc-400 hover:text-zinc-700 active:scale-95 transition-all shrink-0"
               aria-label="閉じる"
               type="button"
@@ -281,7 +307,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                 {date !== todayIso && (
                   <button
                     type="button"
-                    onClick={() => setDate(todayIso)}
+                    onClick={() => requestDateChange(todayIso)}
                     className="h-7 px-3 rounded-full bg-[#f2f2f7] text-[#007aff] text-[10px] font-black active:scale-95 transition-all"
                   >
                     今日
@@ -300,7 +326,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
                       key={item.dateStr}
                       data-date={item.dateStr}
                       type="button"
-                      onClick={() => setDate(item.dateStr)}
+                      onClick={() => requestDateChange(item.dateStr)}
                       className={`snap-center shrink-0 w-[52px] h-[64px] rounded-[20px] flex flex-col items-center justify-center transition-all active:scale-95 ${
                         isActive ? 'bg-[#007aff] text-white shadow-sm' : 'bg-transparent text-slate-500 hover:bg-[#f2f2f7]'
                       }`}
@@ -318,23 +344,23 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div className="ios-list">
               <Field label="結果">
-                <input type="text" placeholder="例: 12000mPR 3'40" value={result} onChange={(e) => setResult(e.target.value)} autoComplete="off" className="ios-input" />
+                <input type="text" placeholder="例: 12000mPR 3'40" value={result} onChange={(e) => update(setResult)(e.target.value)} autoComplete="off" className="ios-input" />
               </Field>
 
               <div className="ios-list-row p-3">
                 <label className="ios-label mb-1.5">走行距離 (km)</label>
                 <div className="grid grid-cols-2 gap-3">
-                  <DistanceInput label="低強度 (jog)" color="text-[#007aff]" value={jog} onChange={setJog} />
-                  <DistanceInput label="中強度 (M-LT)" color="text-emerald-500" value={mlt} onChange={setMlt} />
-                  <DistanceInput label="高強度 (CV-VO2)" color="text-amber-500" value={cv} onChange={setCv} />
-                  <DistanceInput label="解糖系 (スピード)" color="text-orange-500" value={speed} onChange={setSpeed} />
+                  <DistanceInput label="低強度 (jog)" color="text-[#007aff]" value={jog} onChange={update(setJog)} />
+                  <DistanceInput label="中強度 (M-LT)" color="text-emerald-500" value={mlt} onChange={update(setMlt)} />
+                  <DistanceInput label="高強度 (CV-VO2)" color="text-amber-500" value={cv} onChange={update(setCv)} />
+                  <DistanceInput label="解糖系 (スピード)" color="text-orange-500" value={speed} onChange={update(setSpeed)} />
                 </div>
               </div>
 
               <div className="ios-list-row p-3 grid grid-cols-2 gap-3">
                 <div>
                   <label className="ios-label mb-1">流し</label>
-                  <input type="number" min="0" placeholder="例: 3" value={strides} onChange={(e) => setStrides(e.target.value)} autoComplete="off" className="ios-input !py-2.5 !rounded-xl" />
+                  <input type="number" min="0" placeholder="例: 3" value={strides} onChange={(e) => update(setStrides)(e.target.value)} autoComplete="off" className="ios-input !py-2.5 !rounded-xl" />
                 </div>
                 <div className="flex flex-col justify-end">
                   <span className="ios-label mb-1">自動合計</span>
@@ -346,11 +372,11 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
               </div>
 
               <Field label="補強">
-                <input type="text" placeholder="例: 腹筋200, スクワット50" value={reinforce} onChange={(e) => setReinforce(e.target.value)} autoComplete="off" className="ios-input" />
+                <input type="text" placeholder="例: 腹筋200, スクワット50" value={reinforce} onChange={(e) => update(setReinforce)(e.target.value)} autoComplete="off" className="ios-input" />
               </Field>
 
               <Field label="感想">
-                <textarea placeholder="今日の感想、状態、反省など" value={comment} onChange={(e) => setComment(e.target.value)} autoComplete="off" className="ios-input h-32 min-h-32 resize-y text-sm leading-relaxed" />
+                <textarea placeholder="今日の感想、状態、反省など" value={comment} onChange={(e) => update(setComment)(e.target.value)} autoComplete="off" className="ios-input h-32 min-h-32 resize-y text-sm leading-relaxed" />
               </Field>
             </div>
 
