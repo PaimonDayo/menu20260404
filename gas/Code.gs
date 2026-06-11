@@ -41,6 +41,9 @@ function doGet(e) {
     if (action === 'fetchReactions') {
       return handleFetchReactions();
     }
+    if (action === 'fetchSocial') {
+      return handleFetchSocial(e.parameter.limit, e.parameter.bypassCache === 'true');
+    }
 
     return HtmlService.createTemplateFromFile('index')
       .evaluate()
@@ -199,7 +202,7 @@ function handleFetchAll(bypassCache) {
   return createJsonResponse({ source: 'sheets', data: sortedData });
 }
 
-function handleFetchLatestRecords(limitParam, bypassCache) {
+function getLatestRecordsData(limitParam, bypassCache) {
   const limit = Math.max(1, Math.min(parseInt(limitParam || '30', 10) || 30, 100));
   const cache = CacheService.getScriptCache();
   const cacheKey = 'latest_records_' + limit;
@@ -207,7 +210,7 @@ function handleFetchLatestRecords(limitParam, bypassCache) {
   if (!bypassCache) {
     const cachedData = cache.get(cacheKey);
     if (cachedData) {
-      return createJsonResponse({ source: 'cache', data: JSON.parse(cachedData) });
+      return JSON.parse(cachedData);
     }
   }
 
@@ -241,7 +244,21 @@ function handleFetchLatestRecords(limitParam, bypassCache) {
     Logger.log('最近記録キャッシュ保存失敗: ' + err.toString());
   }
 
-  return createJsonResponse({ source: 'sheets', data });
+  return data;
+}
+
+function handleFetchLatestRecords(limitParam, bypassCache) {
+  return createJsonResponse({ source: 'sheets', data: getLatestRecordsData(limitParam, bypassCache) });
+}
+
+/** 最近の記録とリアクションを1リクエストでまとめて返す（往復回数の削減） */
+function handleFetchSocial(limitParam, bypassCache) {
+  return createJsonResponse({
+    data: {
+      latestRecords: getLatestRecordsData(limitParam, bypassCache),
+      reactions: getReactionsData()
+    }
+  });
 }
 
 function handleFetchPractice(month) {
@@ -509,7 +526,7 @@ function makeTargetKey(memberName, date) {
   return memberName + '__' + date;
 }
 
-function handleFetchReactions() {
+function getReactionsData() {
   const ss = getReactionsSpreadsheet();
   const rows = [];
 
@@ -532,7 +549,11 @@ function handleFetchReactions() {
     }
   });
 
-  return createJsonResponse({ reactions: rows });
+  return rows;
+}
+
+function handleFetchReactions() {
+  return createJsonResponse({ reactions: getReactionsData() });
 }
 
 function togglePracticeReaction(data) {

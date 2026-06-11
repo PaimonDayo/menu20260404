@@ -109,7 +109,7 @@ async function readJsonResponse(response, actionLabel) {
 // ── CSV パーサー ──────────────────────────────────────────────────────────────
 
 /** CSVテキストを行の配列に変換（ダブルクォート内の改行・カンマに対応） */
-function parseCsv(text) {
+export function parseCsv(text) {
   const rows = [];
   let row = [];
   let cell = '';
@@ -139,7 +139,7 @@ function parseCsv(text) {
  * "M/D", "YYYY/M/D", "YYYY-MM-DD" → "YYYY-MM-DD" に統一。
  * /export CSV は日付を "2026/4/19" 形式で返すことが多い。
  */
-function parseSheetDate(raw) {
+export function parseSheetDate(raw) {
   // 時刻部分（" 0:00:00"）がついている場合は除去
   let s = raw.trim().split(' ')[0];
   if (!s) return '';
@@ -155,6 +155,52 @@ function parseSheetDate(raw) {
   return s;
 }
 
+/**
+ * 距離セルの自由入力（"12 (1000m×5)"、"５＋３"、"5+5(jog)" 等）を
+ * 合計距離の数値にパースする。
+ */
+export function parseDistanceValue(val) {
+  if (!val) return 0;
+
+  // 1. 全角英数字、全角記号を半角に標準化
+  let cleanVal = val.trim().replace(/[０-９．＋，、（）]/g, (s) => {
+    if (s === '．') return '.';
+    if (s === '＋') return '+';
+    if (s === '，' || s === '、') return ',';
+    if (s === '（') return '(';
+    if (s === '）') return ')';
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+
+  // 2. 括弧とその中身を完全に除去（例: "12 (1000m x 5)" -> "12 ", "5+5(jog)" -> "5+5"）
+  while (cleanVal.includes('(')) {
+    const start = cleanVal.indexOf('(');
+    const end = cleanVal.indexOf(')', start);
+    if (end !== -1) {
+      cleanVal = cleanVal.substring(0, start) + cleanVal.substring(end + 1);
+    } else {
+      // 閉じ括弧がない場合は、開き括弧以降をすべて切り落とす
+      cleanVal = cleanVal.substring(0, start);
+      break;
+    }
+  }
+
+  // 3. + や , で分割してそれぞれをパースし、合計する
+  const parts = cleanVal.split(/[+,]/);
+  let sum = 0;
+  for (const part of parts) {
+    let p = part.trim();
+    // 数字とピリオド以外を完全に除去
+    p = p.replace(/[^\d.]/g, '');
+    if (!p) continue;
+    const num = parseFloat(p);
+    if (!isNaN(num)) {
+      sum += num;
+    }
+  }
+  return sum;
+}
+
 /** "17:00:00" → "17:00"（秒を除去）。時刻以外の文字列はそのまま返す。 */
 function formatTime(raw) {
   if (!raw) return '';
@@ -165,7 +211,7 @@ function formatTime(raw) {
  * 日程一覧の日付文字列（「5/21～5/24」「11/13～15」「1/17」等）をパースし、
  * YYYY-MM-DD 形式の開始日と終了日を返す。
  */
-function parseScheduleRange(yearStr, dateStr) {
+export function parseScheduleRange(yearStr, dateStr) {
   if (!dateStr) return null;
   const normalized = dateStr.replace(/[〜~]/g, '～').replace(/\s+/g, '');
   const parts = normalized.split('～');
@@ -490,54 +536,11 @@ export async function fetchMemberPracticeData(gid, timestamp) {
 
     const dateStr = parseSheetDate(dateRaw); // YYYY-MM-DD 形式にパース
 
-    const parseVal = (val) => {
-      if (!val) return 0;
-      
-      // 1. 全角英数字、全角記号を半角に標準化
-      let cleanVal = val.trim().replace(/[０-９．＋，、（）]/g, (s) => {
-        if (s === '．') return '.';
-        if (s === '＋') return '+';
-        if (s === '，' || s === '、') return ',';
-        if (s === '（') return '(';
-        if (s === '）') return ')';
-        return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
-      });
-
-      // 2. 括弧とその中身を完全に除去（例: "12 (1000m x 5)" -> "12 ", "5+5(jog)" -> "5+5"）
-      while (cleanVal.includes('(')) {
-        const start = cleanVal.indexOf('(');
-        const end = cleanVal.indexOf(')', start);
-        if (end !== -1) {
-          cleanVal = cleanVal.substring(0, start) + cleanVal.substring(end + 1);
-        } else {
-          // 閉じ括弧がない場合は、開き括弧以降をすべて切り落とす
-          cleanVal = cleanVal.substring(0, start);
-          break;
-        }
-      }
-
-      // 3. + や , で分割してそれぞれをパースし、合計する
-      const parts = cleanVal.split(/[+,]/);
-      let sum = 0;
-      for (const part of parts) {
-        let p = part.trim();
-        // 数字とピリオド以外を完全に除去
-        p = p.replace(/[^\d.]/g, '');
-        if (!p) continue;
-        const num = parseFloat(p);
-        if (!isNaN(num)) {
-          sum += num;
-        }
-      }
-      return sum;
-    };
-
-
-    const jogRaw = jogCol !== -1 ? parseVal(row[jogCol]) : 0;
-    const mlt    = mltCol !== -1 ? parseVal(row[mltCol]) : 0;
-    const cv     = cvCol !== -1 ? parseVal(row[cvCol]) : 0;
-    const speed  = speedCol !== -1 ? parseVal(row[speedCol]) : 0;
-    const actual = (totalCol !== -1 && row[totalCol]) ? parseVal(row[totalCol]) : 0;
+    const jogRaw = jogCol !== -1 ? parseDistanceValue(row[jogCol]) : 0;
+    const mlt    = mltCol !== -1 ? parseDistanceValue(row[mltCol]) : 0;
+    const cv     = cvCol !== -1 ? parseDistanceValue(row[cvCol]) : 0;
+    const speed  = speedCol !== -1 ? parseDistanceValue(row[speedCol]) : 0;
+    const actual = (totalCol !== -1 && row[totalCol]) ? parseDistanceValue(row[totalCol]) : 0;
 
     const sumIntensities = jogRaw + mlt + cv + speed;
     let jog = jogRaw;
@@ -558,7 +561,7 @@ export async function fetchMemberPracticeData(gid, timestamp) {
       total = actual;
     }
 
-    const strides = stridesCol !== -1 ? parseVal(row[stridesCol]) : 0;
+    const strides = stridesCol !== -1 ? parseDistanceValue(row[stridesCol]) : 0;
     const reinforce = reinforceCol !== -1 ? (row[reinforceCol]?.trim() ?? '') : '';
     const result = resultCol !== -1 ? (row[resultCol]?.trim() ?? '') : '';
     const comment = commentCol !== -1 ? (row[commentCol]?.trim() ?? '') : '';
@@ -629,6 +632,45 @@ export async function fetchLatestRecords({ limit = 30, bypassCache = false } = {
     throw new Error(json.error);
   }
   return Array.isArray(json?.data) ? json.data : null;
+}
+
+/**
+ * 最近の記録とリアクションをまとめて取得する。
+ * GAS側が action=fetchSocial に対応していれば1往復で済み、
+ * 未対応の古いデプロイでは従来の2リクエストにフォールバックする。
+ */
+export async function fetchSocialData({ limit = 30, bypassCache = false } = {}) {
+  if (!GAS_API_URL || GAS_API_URL.trim() === '') {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      action: 'fetchSocial',
+      limit: String(limit),
+    });
+    if (bypassCache) {
+      params.set('bypassCache', 'true');
+    }
+    const res = await fetch(`${GAS_API_URL}?${params.toString()}`);
+    if (res.ok) {
+      const json = await readJsonResponse(res, 'ソーシャルデータ取得');
+      if (!json?.error && json?.data && (Array.isArray(json.data.latestRecords) || Array.isArray(json.data.reactions))) {
+        return {
+          latestRecords: Array.isArray(json.data.latestRecords) ? json.data.latestRecords : null,
+          reactions: Array.isArray(json.data.reactions) ? json.data.reactions : null,
+        };
+      }
+    }
+  } catch {
+    // フォールバックへ
+  }
+
+  const [latestRecords, reactions] = await Promise.all([
+    fetchLatestRecords({ limit, bypassCache }).catch(() => null),
+    fetchRecordReactions().catch(() => null),
+  ]);
+  return { latestRecords, reactions };
 }
 
 export async function fetchMemberDayRecord(memberName, date) {

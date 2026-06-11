@@ -286,6 +286,20 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
   );
 }
 
+// ── Skeleton ─────────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div className="bg-white border border-slate-100 rounded-3xl px-4.5 py-4 mb-3.5 animate-pulse">
+      <div className="h-4 w-32 bg-slate-100 rounded-full mb-3" />
+      <div className="flex gap-2">
+        <div className="h-5 w-24 bg-slate-100 rounded-full" />
+        <div className="h-5 w-14 bg-slate-100 rounded-full" />
+      </div>
+    </div>
+  );
+}
+
 // ── Tab loading fallback ─────────────────────────────────────────────────────
 
 function TabLoadingFallback() {
@@ -317,6 +331,8 @@ export default function App() {
      const [practiceSessions, setPracticeSessions] = useState([]);
      const [scheduleSessions, setScheduleSessions] = useState([]);
      const [loading, setLoading] = useState(false);
+     const [toast, setToast] = useState('');
+     const toastTimerRef = useRef(null);
      const [showCalendar, setShowCalendar] = useState(false);
      const [showLocations, setShowLocations] = useState(false);
      const [scheduleCategory, setScheduleCategory] = useState('大会・行事'); // 大会・行事, 記録会
@@ -440,6 +456,12 @@ export default function App() {
     setLoading(false);
   }, [updateAllPracticeSessions]);
 
+  function showToast(message) {
+    setToast(message);
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(''), 2000);
+  }
+
   async function handleManualRefresh() {
     if (activeMonth === '日程一覧') {
       await loadSchedule(Date.now());
@@ -447,6 +469,8 @@ export default function App() {
       delete sessionCache.current[activeMonth];
       await loadData(activeMonth);
     }
+    const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    showToast(`✓ 更新しました ${time}`);
   }
 
   function handleMonthChange(month) {
@@ -581,13 +605,6 @@ export default function App() {
 
         const records = Array.isArray(member.records) ? [...member.records] : [];
         const existingIndex = records.findIndex(record => record.date === payload.date);
-
-        if (payload.isDelete) {
-          return {
-            ...member,
-            records: records.filter(record => record.date !== payload.date),
-          };
-        }
 
         const existing = existingIndex >= 0 ? records[existingIndex] : {};
         const jog = toNum(payload.jog);
@@ -782,9 +799,8 @@ export default function App() {
 
             {/* 練習メニューリスト */}
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-                <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
-                <p className="text-xs font-bold">練習メニュー取得中...</p>
+              <div aria-label="練習メニュー読み込み中">
+                {[0, 1, 2, 3].map(i => <SkeletonCard key={i} />)}
               </div>
             ) : !hasContent ? (
               <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-3xl bg-white">
@@ -897,6 +913,15 @@ export default function App() {
         memberName={selectedMember}
         onRecordSubmitted={handleRecordSubmitted}
       />
+
+      {/* 同期完了トースト */}
+      {toast && (
+        <div className="fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none animate-fade-in">
+          <span className="px-4 py-2 rounded-full bg-slate-800/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm">
+            {toast}
+          </span>
+        </div>
+      )}
 
       {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}
       <nav

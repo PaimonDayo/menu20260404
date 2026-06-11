@@ -76,15 +76,14 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   const [reinforce, setReinforce] = useState('');
   const [comment, setComment] = useState('');
   const [syncing, setSyncing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [recordCache, setRecordCache] = useState({});
 
   const todayIso = useMemo(() => getTodayIso(), []);
   const minIso = useMemo(() => addDays(todayIso, -29), [todayIso]);
   const recentDates = useMemo(() => makeRecentDates(), []);
   const selectedDate = useMemo(() => dateParts(date), [date]);
   const railRef = useRef(null);
-  const cacheRef = useRef(recordCache);
+  // 取得済み記録のキャッシュ。表示には使わないため state ではなく ref で保持する
+  const cacheRef = useRef({});
   // 未保存の編集があるか。確認なしの破棄や、同期完了時の入力上書きを防ぐ
   const dirtyRef = useRef(false);
 
@@ -110,14 +109,11 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
     if (isOpen) dirtyRef.current = false;
   }, [isOpen]);
 
-  useEffect(() => {
-    cacheRef.current = recordCache;
-  }, [recordCache]);
-
   const cacheKeyFor = useCallback((member, dateStr) => `${member}__${dateStr}`, []);
 
   useEffect(() => {
     if (!isOpen || !memberName) return;
+    // 開いたメンバー自身のキャッシュは破棄して常に最新を取得させる
     const nextCache = {};
     Object.entries(cacheRef.current).forEach(([key, value]) => {
       if (!key.startsWith(`${memberName}__`)) {
@@ -125,15 +121,6 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       }
     });
     cacheRef.current = nextCache;
-    setRecordCache((prev) => {
-      const next = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        if (!key.startsWith(`${memberName}__`)) {
-          next[key] = value;
-        }
-      });
-      return next;
-    });
   }, [isOpen, memberName]);
 
   const clearForm = useCallback(() => {
@@ -166,7 +153,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
   const fetchAndCache = useCallback(async (member, dateStr) => {
     const key = cacheKeyFor(member, dateStr);
     const res = await fetchMemberDayRecord(member, dateStr);
-    setRecordCache((prev) => ({ ...prev, [key]: res || { exists: false } }));
+    cacheRef.current = { ...cacheRef.current, [key]: res || { exists: false } };
     return res;
   }, [cacheKeyFor]);
 
@@ -198,7 +185,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
       .then((res) => {
         if (mounted) {
           const merged = mergeRecordResponse(cached, res);
-          setRecordCache((prev) => ({ ...prev, [key]: merged }));
+          cacheRef.current = { ...cacheRef.current, [key]: merged };
           // 同期中にユーザーが入力を始めていたら、取得結果で上書きしない
           if (!dirtyRef.current) applyRecord(merged);
         }
@@ -229,37 +216,35 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
     return Math.round(total * 100) / 100;
   };
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault();
     if (!memberName || !date) return;
 
-    setSubmitting(true);
-    try {
-      const total = totalDistance();
-      const payload = {
-        memberName,
-        date,
-        result: result.trim(),
-        jog: asNumberOrBlank(jog),
-        mlt: asNumberOrBlank(mlt),
-        cv: asNumberOrBlank(cv),
-        speed: asNumberOrBlank(speed),
-        strides: asNumberOrBlank(strides),
-        reinforce: reinforce.trim(),
-        comment: comment.trim(),
-        total: total > 0 ? total : '',
-      };
+    const total = totalDistance();
+    const payload = {
+      memberName,
+      date,
+      result: result.trim(),
+      jog: asNumberOrBlank(jog),
+      mlt: asNumberOrBlank(mlt),
+      cv: asNumberOrBlank(cv),
+      speed: asNumberOrBlank(speed),
+      strides: asNumberOrBlank(strides),
+      reinforce: reinforce.trim(),
+      comment: comment.trim(),
+      total: total > 0 ? total : '',
+    };
 
-      await submitPracticeRecord(payload);
-      setRecordCache((prev) => ({ ...prev, [cacheKeyFor(memberName, date)]: { exists: true, data: payload } }));
-      onRecordSubmitted?.(payload);
-      dirtyRef.current = false;
-      onClose();
-    } catch (err) {
-      window.alert(`保存に失敗しました: ${err.message}`);
-    } finally {
-      setSubmitting(false);
-    }
+    // 楽観的送信: 即座に閉じて送信は裏で行う。入力内容はキャッシュに残るので、
+    // 失敗時はドロワーを開き直せばそのまま再保存できる
+    cacheRef.current = { ...cacheRef.current, [cacheKeyFor(memberName, date)]: { exists: true, data: payload } };
+    onRecordSubmitted?.(payload);
+    dirtyRef.current = false;
+    onClose();
+
+    submitPracticeRecord(payload).catch((err) => {
+      window.alert(`${dateParts(date).full} の記録の保存に失敗しました: ${err.message}\n入力内容は残っています。記録入力を開き直して、もう一度保存してください。`);
+    });
   };
 
   if (!isOpen) return null;
@@ -360,7 +345,7 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
               <div className="ios-list-row p-3 grid grid-cols-2 gap-3">
                 <div>
                   <label className="ios-label mb-1">流し</label>
-                  <input type="number" min="0" placeholder="例: 3" value={strides} onChange={(e) => update(setStrides)(e.target.value)} autoComplete="off" className="ios-input !py-2.5 !rounded-xl" />
+                  <input type="number" inputMode="numeric" min="0" placeholder="例: 3" value={strides} onChange={(e) => update(setStrides)(e.target.value)} autoComplete="off" className="ios-input !py-2.5 !rounded-xl" />
                 </div>
                 <div className="flex flex-col justify-end">
                   <span className="ios-label mb-1">自動合計</span>
@@ -381,18 +366,9 @@ export default function RecordInputDrawer({ isOpen, onClose, memberName, onRecor
             </div>
 
             <div className="flex gap-2 pt-2">
-              <button type="submit" disabled={submitting} className="h-12 min-w-0 flex-1 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)] overflow-hidden">
-                {submitting ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                    <span className="whitespace-nowrap">送信中</span>
-                  </>
-                ) : (
-                  <>
-                    <Send size={12} className="shrink-0" />
-                    <span className="whitespace-nowrap">保存</span>
-                  </>
-                )}
+              <button type="submit" className="h-12 min-w-0 flex-1 bg-[#007aff] text-white font-extrabold text-xs rounded-2xl flex items-center justify-center gap-2 active:opacity-75 transition-all shadow-[0_8px_18px_rgba(0,122,255,0.18)] overflow-hidden">
+                <Send size={12} className="shrink-0" />
+                <span className="whitespace-nowrap">保存</span>
               </button>
             </div>
           </form>
@@ -415,7 +391,7 @@ function DistanceInput({ label, color, value, onChange }) {
   return (
     <div>
       <span className={`text-[9px] font-extrabold ${color} block mb-0.5`}>{label}</span>
-      <input type="number" step="0.1" min="0" placeholder="0.0" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="off" className="ios-input !px-3 !py-2.5 !rounded-xl" />
+      <input type="number" inputMode="decimal" step="0.1" min="0" placeholder="0.0" value={value} onChange={(e) => onChange(e.target.value)} autoComplete="off" className="ios-input !px-3 !py-2.5 !rounded-xl" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Trophy, BarChart3, User, Calendar, Flame, AlertCircle, RefreshCcw, Activity, ChevronDown, Award, Users, TrendingUp, X, ChevronRight, HelpCircle, Send, Heart } from 'lucide-react';
-import { fetchAllMembersStats, fetchLatestRecords, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply, fetchRecordReactions, toggleRecordReaction, getReactionActorId } from '../services/sheetsService';
+import { fetchAllMembersStats, fetchSocialData, fetchSheetList, fetchMemberPracticeData, hasConfig, submitRecordReply, fetchRecordReactions, toggleRecordReaction, getReactionActorId } from '../services/sheetsService';
 
 // 強度別のプレミアム・パステルカラー設定 (スプレッドシート準拠の配色)
 const INTENSITY_COLORS = {
@@ -277,6 +277,9 @@ export default function StatsDashboard({
   }, [rankingDetailMember]);
 
   useEffect(() => {
+    // ソーシャル系セクションでは下の統合フェッチがリアクションも取得する
+    if (showSection === 'ranking' || showSection === 'recent') return;
+
     let mounted = true;
     fetchRecordReactions()
       .then(rows => {
@@ -291,27 +294,49 @@ export default function StatsDashboard({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [showSection]);
 
   useEffect(() => {
     if (showSection !== 'ranking' && showSection !== 'recent') return;
 
     let mounted = true;
-    fetchLatestRecords({ limit: 100 })
-      .then(records => {
-        if (Array.isArray(records)) {
-          if (mounted) setLatestRecords(records);
-          try {
-            localStorage.setItem('tf_latest_records_cache_v1', JSON.stringify(records));
-          } catch { /* 容量超過時は無視 */ }
-        }
-      })
-      .catch(err => {
-        console.warn('最近の練習記録の軽量取得に失敗しました。全体データから生成します:', err);
-      });
+    const load = () => {
+      fetchSocialData({ limit: 100 })
+        .then(result => {
+          if (!mounted || !result) return;
+          if (Array.isArray(result.latestRecords)) {
+            setLatestRecords(result.latestRecords);
+            try {
+              localStorage.setItem('tf_latest_records_cache_v1', JSON.stringify(result.latestRecords));
+            } catch { /* 容量超過時は無視 */ }
+          }
+          if (Array.isArray(result.reactions)) {
+            setReactions(result.reactions);
+            try {
+              localStorage.setItem('tf_reactions_cache_v1', JSON.stringify(result.reactions));
+            } catch { /* 容量超過時は無視 */ }
+          }
+        })
+        .catch(err => {
+          console.warn('ソーシャルデータの取得に失敗しました:', err);
+        });
+    };
+
+    load();
+
+    // 他のメンバーのいいね・記録を準リアルタイムに反映する（画面表示中のみ）
+    const intervalId = setInterval(() => {
+      if (document.visibilityState === 'visible') load();
+    }, 45000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') load();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       mounted = false;
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [showSection]);
 
@@ -616,13 +641,6 @@ export default function StatsDashboard({
         const records = Array.isArray(member.records) ? [...member.records] : [];
         const existingIndex = records.findIndex(record => record.date === payload.date);
 
-        if (payload.isDelete) {
-          return {
-            ...member,
-            records: records.filter(record => record.date !== payload.date),
-          };
-        }
-
         const existing = existingIndex >= 0 ? records[existingIndex] : {};
         const jog = toNum(payload.jog);
         const mlt = toNum(payload.mlt);
@@ -658,10 +676,6 @@ export default function StatsDashboard({
       }));
       setLatestRecords(prev => {
         if (!Array.isArray(prev)) return prev;
-        if (payload.isDelete) {
-          return prev.filter(record => !(record.memberName === payload.memberName && record.date === payload.date));
-        }
-
         const toNumRecord = (value) => {
           const num = parseFloat(value);
           return Number.isFinite(num) ? Math.round(num * 100) / 100 : 0;
