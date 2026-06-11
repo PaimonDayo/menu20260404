@@ -125,7 +125,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
       )}
 
       {/* Card Header — クリックで展開 */}
-      <button className="w-full text-left px-4.5 py-4 focus:outline-none" onClick={() => setExpanded(v => !v)}>
+      <button className="w-full text-left px-4.5 py-4 focus:outline-none" onClick={() => setExpanded(v => !v)} aria-expanded={expanded}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
 
@@ -310,7 +310,8 @@ export default function App() {
      const [scheduleCategory, setScheduleCategory] = useState('大会・行事'); // 大会・行事, 記録会
      
      // 📱 新マルチタブ用の状態変数
-     const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'ranking' | 'analytics'
+     const [activeTab, setActiveTab] = useState('schedule'); // 'schedule' | 'social' | 'analytics'
+     const [socialSection, setSocialSection] = useState('recent'); // 'recent' | 'ranking'
      const [socialResetKey, setSocialResetKey] = useState(0);
      const [myPageResetKey, setMyPageResetKey] = useState(0);
      const [showInputDrawer, setShowInputDrawer] = useState(false);
@@ -328,6 +329,7 @@ export default function App() {
 
   const scrollToId = useRef(null);
   const sessionCache = useRef({});
+  const freshPreloadDoneRef = useRef(false); // 月初の強制再取得はセッション中1回だけ
   const [allPracticeSessions, setAllPracticeSessions] = useState([]);
 
   const updateAllPracticeSessions = useCallback(() => {
@@ -340,22 +342,22 @@ export default function App() {
     async function preloadAll() {
       const targetMonths = months.filter(m => m !== '日程一覧');
       const isBeginningOfMonth = new Date().getDate() <= 3;
-      const ts = isBeginningOfMonth ? Date.now() : null;
+      const forceFresh = isBeginningOfMonth && !freshPreloadDoneRef.current;
+      if (isBeginningOfMonth) freshPreloadDoneRef.current = true;
+      const ts = forceFresh ? Date.now() : null;
 
-      for (const m of targetMonths) {
-        if (!sessionCache.current[m] || sessionCache.current[m].length === 0 || isBeginningOfMonth) {
-          try {
-            if (hasConfig()) {
-              const d = await fetchPracticeData(m, ts);
-              sessionCache.current[m] = d;
-            } else {
-              sessionCache.current[m] = [...(mockData[m] ?? [])];
-            }
-          } catch {
+      await Promise.all(targetMonths.map(async (m) => {
+        if (sessionCache.current[m]?.length > 0 && !forceFresh) return;
+        try {
+          if (hasConfig()) {
+            sessionCache.current[m] = await fetchPracticeData(m, ts);
+          } else {
             sessionCache.current[m] = [...(mockData[m] ?? [])];
           }
+        } catch {
+          sessionCache.current[m] = [...(mockData[m] ?? [])];
         }
-      }
+      }));
       if (practiceSessions.length === 0) {
         setPracticeSessions(sessionCache.current[activeMonth] || []);
       }
@@ -658,6 +660,7 @@ export default function App() {
             disabled={loading}
             className={`p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-800 transition-colors shadow-sm ${loading ? 'animate-spin opacity-50' : ''}`}
             title="データを同期"
+            aria-label="データを同期"
           >
             <RefreshCcw size={15} />
           </button>
@@ -843,9 +846,11 @@ export default function App() {
         )}
 
         {/* 🏆 Tab 2: ランキング */}
-        {activeTab === 'ranking' && (
+        {activeTab === 'social' && (
           <StatsDashboard 
-            showSection="ranking" 
+            showSection={socialSection} 
+            socialSection={socialSection}
+            setSocialSection={setSocialSection}
             selectedMember={selectedMember}
             setSelectedMember={setSelectedMember}
             setActiveTab={setActiveTab}
@@ -875,7 +880,10 @@ export default function App() {
       />
 
       {/* ── 📱 Floating Sleek Bottom Navigation Bar ── */}
-      <nav className="fixed bottom-4 inset-x-4 z-40 rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] flex justify-around items-center max-w-md mx-auto">
+      <nav
+        className="fixed inset-x-4 z-40 rounded-[24px] bg-white/90 backdrop-blur-xl border border-slate-200/80 px-2 py-2.5 shadow-[0_-8px_30px_rgba(0,0,0,0.03)] flex justify-around items-center max-w-md mx-auto"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)' }}
+      >
         
         {/* ボタン: 予定 */}
         <button
@@ -899,19 +907,19 @@ export default function App() {
         {/* ボタン: ランキング */}
         <button
           onClick={() => {
-            if (activeTab === 'ranking') {
+            if (activeTab === 'social') {
               setSocialResetKey((prev) => prev + 1);
             } else {
-              setActiveTab('ranking');
+              setActiveTab('social');
             }
           }}
           className={`flex flex-col items-center gap-1 flex-1 py-1.5 rounded-xl transition-all ${
-            activeTab === 'ranking' 
+            activeTab === 'social' 
               ? 'text-blue-600 font-extrabold scale-105' 
               : 'text-slate-400 active:text-slate-600'
           }`}
         >
-          <Users size={18} className={activeTab === 'ranking' ? 'text-blue-600' : ''} />
+          <Users size={18} className={activeTab === 'social' ? 'text-blue-600' : ''} />
           <span className="text-[9px] tracking-wide font-black">ソーシャル</span>
         </button>
 

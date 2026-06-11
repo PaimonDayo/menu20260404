@@ -148,8 +148,8 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                         const dow = (firstDow + d - 1) % 7;
                         
                         let hoverClass = 'active:bg-slate-50';
-                        if (info?.hasEvent) hoverClass = 'active:bg-fuchsia-50';
-                        else if (info?.hasRecord) hoverClass = 'active:bg-teal-50';
+                        if (info?.hasEvent) hoverClass = 'active:bg-orange-50';
+                        else if (info?.hasRecord) hoverClass = 'active:bg-emerald-50';
                         else if (info?.hasPractice) hoverClass = 'active:bg-blue-50';
                         
                         return (
@@ -179,10 +179,10 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                                             <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
                                         )}
                                         {info?.hasEvent && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                                         )}
                                         {info?.hasRecord && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                                         )}
                                     </div>
                                 </div>
@@ -198,11 +198,11 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                         練習
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-fuchsia-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
                         大会・行事
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                         記録会
                     </div>
                 </div>

@@ -21,36 +21,43 @@ import { SPREADSHEET_ID, GAS_API_URL } from '../config';
 
 const BASE_URL = 'https://docs.google.com/spreadsheets/d';
 
-let sheetMetaCache = null;
+// Promiseをキャッシュすることで、並列呼び出し時もhtmlviewの取得が1回で済む
+let sheetMetaPromise = null;
 
-async function fetchSheetMetaList() {
-  if (sheetMetaCache) return sheetMetaCache;
+function fetchSheetMetaList() {
+  if (sheetMetaPromise) return sheetMetaPromise;
 
-  const url = `${BASE_URL}/${SPREADSHEET_ID}/htmlview`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`シート一覧の取得に失敗しました (${res.status})`);
-  }
-
-  const html = await res.text();
-  if (html.trimStart().startsWith('<!DOCTYPE') && html.includes('エラー')) {
-    throw new Error('シート一覧の取得に失敗しました。共有設定を確認してください。');
-  }
-
-  const regex = /items\.push\(\s*({[^}]+})\s*\)/g;
-  const sheets = [];
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    const objText = match[1];
-    const nameMatch = /name:\s*"([^"]+)"/.exec(objText);
-    const gidMatch = /gid:\s*"([^"]+)"/.exec(objText);
-    if (nameMatch && gidMatch) {
-      sheets.push({ name: nameMatch[1], gid: gidMatch[1] });
+  sheetMetaPromise = (async () => {
+    const url = `${BASE_URL}/${SPREADSHEET_ID}/htmlview`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`シート一覧の取得に失敗しました (${res.status})`);
     }
-  }
 
-  sheetMetaCache = sheets;
-  return sheets;
+    const html = await res.text();
+    if (html.trimStart().startsWith('<!DOCTYPE') && html.includes('エラー')) {
+      throw new Error('シート一覧の取得に失敗しました。共有設定を確認してください。');
+    }
+
+    const regex = /items\.push\(\s*({[^}]+})\s*\)/g;
+    const sheets = [];
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      const objText = match[1];
+      const nameMatch = /name:\s*"([^"]+)"/.exec(objText);
+      const gidMatch = /gid:\s*"([^"]+)"/.exec(objText);
+      if (nameMatch && gidMatch) {
+        sheets.push({ name: nameMatch[1], gid: gidMatch[1] });
+      }
+    }
+
+    return sheets;
+  })().catch(err => {
+    sheetMetaPromise = null; // 失敗時はキャッシュを破棄し、次回リトライ可能にする
+    throw err;
+  });
+
+  return sheetMetaPromise;
 }
 
 async function findSheetGidByName(sheetName) {
@@ -265,7 +272,10 @@ export async function fetchPracticeData(month, timestamp) {
       const gasRes = await fetch(gasUrl);
       if (gasRes.ok) {
         const json = await gasRes.json();
-        if (Array.isArray(json?.data)) return json.data;
+        if (Array.isArray(json?.data)) {
+          // IDは月をまたいで一意にする（月別に連番を振ると他の月と衝突するため）
+          return json.data.map((item, i) => ({ ...item, id: `${month}-${i + 1}` }));
+        }
       }
     } catch (err) {
       console.warn('GAS経由の練習メニュー取得に失敗しました。CSV取得へフォールバックします。', err);
@@ -305,7 +315,7 @@ export async function fetchPracticeData(month, timestamp) {
       const locStr = (row[3] ?? '').trim();
 
       return {
-        id:        i + 1,
+        id:        `${month}-${i + 1}`,
         date:      dateStr,
         dayOfWeek: (row[1] ?? '').trim(),
         time:      formatTime(row[2] ?? ''),

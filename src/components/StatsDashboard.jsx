@@ -26,6 +26,12 @@ const getTodayIso = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const addDaysIso = (dateStr, amount) => {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + amount);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const hasTimelineContent = (rec) => {
   if (!rec) return false;
   return Number(rec.total || 0) > 0
@@ -41,15 +47,14 @@ const hasTimelineContent = (rec) => {
     || (Array.isArray(rec.replies) && rec.replies.some(reply => Boolean((reply || '').trim())));
 };
 
-const buildLatestRecordsFromMembers = (members, todayIso, limit = 30) => {
+const buildLatestRecordsFromMembers = (members, todayIso) => {
   return members
     .flatMap(member => (member.records || []).map(record => ({
       ...record,
       memberName: member.name,
     })))
     .filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, limit);
+    .sort((a, b) => b.date.localeCompare(a.date));
 };
 
 const REACTION_OPTIONS = [
@@ -206,6 +211,8 @@ const getRankingTicks = (limit) => {
 
 export default function StatsDashboard({ 
   showSection = 'ranking', 
+  socialSection = 'recent',
+  setSocialSection = () => {},
   onDataLoaded = null,
   selectedMember = '',
   setSelectedMember = () => {},
@@ -219,8 +226,8 @@ export default function StatsDashboard({
   const [activeDailyIdx, setActiveDailyIdx] = useState(null); // タップされた日次のインデックス
   const [activeMonthIdx, setActiveMonthIdx] = useState(null); // タップされた月次のインデックス
   const [rankingGrade, setRankingGrade] = useState(''); // ランキング用学年フィルター ("" = すべて)
+  const [latestGrade, setLatestGrade] = useState('');
   const [showAllRanking, setShowAllRanking] = useState(false); // もっと見るフラグ
-  const [showAllLatest, setShowAllLatest] = useState(false);
   const [rankingDetailMember, setRankingDetailMember] = useState(''); // ランキング内詳細表示部員名
   const [modalGrade, setModalGrade] = useState(''); // モーダル内学年フィルター
   const [replyDrafts, setReplyDrafts] = useState({});
@@ -236,7 +243,7 @@ export default function StatsDashboard({
     setActiveDailyIdx(null);
     setActiveMonthIdx(null);
     setShowMemberSheet(false);
-    if (showSection === 'ranking') {
+    if (showSection === 'ranking' || showSection === 'recent') {
       setRankingDetailMember('');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -271,10 +278,10 @@ export default function StatsDashboard({
   }, []);
 
   useEffect(() => {
-    if (showSection !== 'ranking') return;
+    if (showSection !== 'ranking' && showSection !== 'recent') return;
 
     let mounted = true;
-    fetchLatestRecords({ limit: 30 })
+    fetchLatestRecords({ limit: 100 })
       .then(records => {
         if (mounted && Array.isArray(records)) {
           setLatestRecords(records);
@@ -743,14 +750,27 @@ export default function StatsDashboard({
   }, [rankingData, showAllRanking]);
 
   const allLatestSocialRecords = useMemo(() => {
-    return Array.isArray(latestRecords)
-      ? latestRecords.filter(record => record.date && record.date <= todayIso && hasTimelineContent(record)).slice(0, 30)
-      : buildLatestRecordsFromMembers(members, todayIso);
-  }, [latestRecords, members, todayIso]);
+    const source = members.length > 0
+      ? buildLatestRecordsFromMembers(members, todayIso)
+      : (Array.isArray(latestRecords)
+        ? latestRecords.filter(record => record.date && record.date <= todayIso && hasTimelineContent(record))
+        : []);
+    const yesterdayIso = addDaysIso(todayIso, -1);
+    let olderCount = 0;
 
-  const latestSocialRecords = useMemo(() => {
-    return showAllLatest ? allLatestSocialRecords : allLatestSocialRecords.slice(0, 5);
-  }, [allLatestSocialRecords, showAllLatest]);
+    return source
+      .filter(record => !latestGrade || getGradeFromName(record.memberName) === latestGrade)
+      .filter(record => {
+        if (record.date === todayIso || record.date === yesterdayIso) return true;
+        if (olderCount < 30) {
+          olderCount += 1;
+          return true;
+        }
+        return false;
+      });
+  }, [latestRecords, members, todayIso, latestGrade]);
+
+  const latestSocialRecords = allLatestSocialRecords;
 
   const reactionSummary = useMemo(() => {
     const summary = {};
@@ -772,19 +792,22 @@ export default function StatsDashboard({
     const reply = (replyDrafts[key] || '').trim();
     if (!reply) return;
 
-    setReplySubmittingKey(key);
-    try {
-      await submitRecordReply({ memberName, date, reply });
+    const appendReply = (replies) => [...(replies || []), reply];
+    const removeReply = (replies) => {
+      const next = [...(replies || [])];
+      const idx = next.lastIndexOf(reply);
+      if (idx !== -1) next.splice(idx, 1);
+      return next;
+    };
+
+    const applyToState = (transform) => {
       setMembers(prev => prev.map(member => {
         if (member.name !== memberName) return member;
         return {
           ...member,
           records: member.records.map(record => {
             if (record.date !== date) return record;
-            return {
-              ...record,
-              replies: [...(record.replies || []), reply],
-            };
+            return { ...record, replies: transform(record.replies) };
           }),
         };
       }));
@@ -792,14 +815,20 @@ export default function StatsDashboard({
         if (!Array.isArray(prev)) return prev;
         return prev.map(record => {
           if (record.memberName !== memberName || record.date !== date) return record;
-          return {
-            ...record,
-            replies: [...(record.replies || []), reply],
-          };
+          return { ...record, replies: transform(record.replies) };
         });
       });
-      setReplyDrafts(prev => ({ ...prev, [key]: '' }));
+    };
+
+    // 楽観的更新: 先に画面へ反映し、失敗したら巻き戻して下書きを復元する
+    applyToState(appendReply);
+    setReplyDrafts(prev => ({ ...prev, [key]: '' }));
+    setReplySubmittingKey(key);
+    try {
+      await submitRecordReply({ memberName, date, reply });
     } catch (err) {
+      applyToState(removeReply);
+      setReplyDrafts(prev => ({ ...prev, [key]: reply }));
       window.alert(`リプライの送信に失敗しました: ${err.message}`);
     } finally {
       setReplySubmittingKey('');
@@ -809,22 +838,29 @@ export default function StatsDashboard({
   const handleToggleReaction = async (memberName, date, type) => {
     const targetKey = makeReactionTargetKey(memberName, date);
     const submitKey = `${targetKey}__${type}`;
-    const optimisticItem = {
-      createdAt: new Date().toISOString(),
-      targetKey,
-      targetMember: memberName,
-      targetDate: date,
-      type,
-      actorId: reactionActorId,
-    };
-    const optimistic = [...reactions, optimisticItem];
+    const prevReactions = reactions;
+
+    // 既に自分がリアクション済みなら解除（除去）、未リアクションなら追加
+    const isMine = (item) =>
+      item.targetKey === targetKey && item.type === type && item.actorId === reactionActorId;
+    const alreadyReacted = reactions.some(isMine);
+    const optimistic = alreadyReacted
+      ? reactions.filter(item => !isMine(item))
+      : [...reactions, {
+          createdAt: new Date().toISOString(),
+          targetKey,
+          targetMember: memberName,
+          targetDate: date,
+          type,
+          actorId: reactionActorId,
+        }];
 
     setReactionSubmittingKey(submitKey);
     setReactions(optimistic);
     try {
       await toggleRecordReaction({ memberName, date, type });
     } catch (err) {
-      setReactions(reactions);
+      setReactions(prevReactions);
       window.alert(`リアクションの送信に失敗しました: ${err.message}`);
     } finally {
       setReactionSubmittingKey('');
@@ -1388,22 +1424,75 @@ export default function StatsDashboard({
 
   return (
     <div className="animate-fade-in pb-8">
-      {/* 🏆 Tab 2: ランキング表示 */}
-      {showSection === 'ranking' && !rankingDetailMember && (
+      {(showSection === 'recent' || showSection === 'ranking') && !rankingDetailMember && (
+        <div className="mb-3 bg-slate-100/70 p-0.5 rounded-2xl flex w-full border border-slate-100">
+          {[
+            { key: 'recent', label: '最近', icon: Activity },
+            { key: 'ranking', label: 'ランキング', icon: Trophy },
+          ].map(item => {
+            const Icon = item.icon;
+            const active = socialSection === item.key;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setSocialSection(item.key)}
+                className={`flex-1 h-10 rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-black transition-all ${
+                  active
+                    ? 'bg-white text-[#007aff] shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
+                    : 'text-slate-400 active:text-slate-600'
+                }`}
+              >
+                <Icon size={15} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {showSection === 'recent' && !rankingDetailMember && (
         <div className="space-y-4">
-          <div className="ios-card rounded-[28px] p-4 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="ios-card rounded-[28px] p-4 space-y-4">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
                 <div className="w-6 h-6 rounded-lg bg-[#f2f2f7] flex items-center justify-center text-[#007aff]">
                   <Activity size={13} />
                 </div>
                 <h3 className="text-sm font-black text-slate-800">最近</h3>
               </div>
+              <span className="text-[10px] font-black text-slate-400">{latestSocialRecords.length}件</span>
+            </div>
+
+            <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap py-1 scrollbar-none">
+              <button
+                onClick={() => setLatestGrade('')}
+                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                  latestGrade === ''
+                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
+                    : 'bg-slate-50/60 border-slate-100/80 text-slate-500'
+                }`}
+              >
+                すべて
+              </button>
+              {gradeList.map(g => (
+                <button
+                  key={g}
+                  onClick={() => setLatestGrade(g)}
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                    latestGrade === g
+                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
+                      : 'bg-slate-50/60 border-slate-100/80 text-slate-500'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
             </div>
 
             {latestSocialRecords.length === 0 ? (
-              <div className="text-center py-8 text-slate-400 text-xs font-bold bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
-                まだ練習記録がありません
+              <div className="text-center py-10 text-slate-400 text-xs font-bold bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+                表示できる記録がありません
               </div>
             ) : (
               <div className="space-y-2">
@@ -1419,21 +1508,23 @@ export default function StatsDashboard({
                         onClick={() => setRankingDetailMember(rec.memberName)}
                         className="w-full text-left p-3 hover:bg-[#f2f2f7]/60 active:scale-[0.99] transition-all"
                       >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <span className="text-[9px] text-slate-400 font-black block leading-none">{dateText}</span>
-                          <span className="text-xs font-black text-slate-800 block mt-1 truncate">{formatMemberName(rec.memberName)}</span>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <span className="inline-flex items-center gap-1 text-[9px] text-slate-400 font-black leading-none">
+                              <Calendar size={10} />
+                              {dateText}
+                            </span>
+                            <span className="flex items-center gap-1 text-xs font-black text-slate-800 mt-1 truncate">
+                              <User size={11} className="text-slate-300 shrink-0" />
+                              <span className="truncate">{formatMemberName(rec.memberName)}</span>
+                            </span>
+                          </div>
+                          <span className="inline-flex items-center gap-1 text-xs font-black text-[#007aff] shrink-0">
+                            <Activity size={13} />
+                            {rec.total || 0}<span className="text-[8px] text-slate-400 ml-0.5">km</span>
+                          </span>
                         </div>
-                        <span className="text-xs font-black text-[#007aff] shrink-0">
-                          {rec.total || 0}<span className="text-[8px] text-slate-400 ml-0.5">km</span>
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-bold">
-                        {rec.result && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-700 truncate max-w-full">{rec.result}</span>}
-                        {rec.strides > 0 && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">流し {rec.strides}本</span>}
-                        {rec.reinforce && <span className="px-2 py-1 rounded-full bg-[#f2f2f7] text-slate-600">補強</span>}
-                      </div>
-                      {rec.comment && <p className="mt-2 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{rec.comment}</p>}
+                        <TimelineRecordFields rec={rec} focusKey="total" />
                       </button>
                       <div className="px-3 pb-3">
                         {renderFeedbackControls(rec.memberName, rec, { allowReplyInput: false })}
@@ -1441,19 +1532,14 @@ export default function StatsDashboard({
                     </div>
                   );
                 })}
-                {allLatestSocialRecords.length > 5 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllLatest(v => !v)}
-                    className="w-full h-10 rounded-2xl bg-[#f2f2f7] text-slate-600 text-xs font-black active:scale-[0.99] transition-all"
-                  >
-                    {showAllLatest ? '閉じる' : `もっと見る (${allLatestSocialRecords.length - 5})`}
-                  </button>
-                )}
               </div>
             )}
           </div>
-
+        </div>
+      )}
+      {/* 🏆 Tab 2: ランキング表示 */}
+      {showSection === 'ranking' && !rankingDetailMember && (
+        <div className="space-y-4">
           {/* 🏆 ランキングカード */}
           <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-4">
             <div className="flex items-center justify-between">
@@ -1684,7 +1770,7 @@ export default function StatsDashboard({
       )}
 
       {/* 🏆 Tab 2-2: ランキング内詳細表示 */}
-      {showSection === 'ranking' && rankingDetailMember && (
+      {(showSection === 'ranking' || showSection === 'recent') && rankingDetailMember && (
         <div className="space-y-4">
           
           {/* ← ランキングに戻るボタン */}
@@ -2609,7 +2695,7 @@ export default function StatsDashboard({
                   );
                 }
                 return filtered.map(m => {
-                  const activeMemberForSheet = showSection === 'ranking' && rankingDetailMember ? rankingDetailMember : selectedMember;
+                  const activeMemberForSheet = (showSection === 'ranking' || showSection === 'recent') && rankingDetailMember ? rankingDetailMember : selectedMember;
                   const isSelected = activeMemberForSheet === m.name;
                   const grade = getGradeFromName(m.name);
                   const nameOnly = getOnlyName(m.name);
@@ -2618,7 +2704,7 @@ export default function StatsDashboard({
                     <button
                       key={m.name}
                       onClick={() => {
-                        if (showSection === 'ranking' && rankingDetailMember) {
+                        if ((showSection === 'ranking' || showSection === 'recent') && rankingDetailMember) {
                           setRankingDetailMember(m.name);
                         } else {
                           setSelectedMember(m.name);
