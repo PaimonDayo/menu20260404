@@ -678,7 +678,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <div>
               <h1 className="text-sm font-bold text-zinc-800 tracking-tight leading-none">TUAT RUNNING STATS</h1>
-              <span className="text-[10px] text-zinc-400 font-extrabold tracking-wider leading-none mt-1.5 block">TRACK & FIELD</span>
+              <span className="text-[10px] text-zinc-400 font-extrabold tracking-wider leading-none mt-1.5 block">TRACK & GROW</span>
             </div>
           </div>
           
