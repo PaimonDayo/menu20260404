@@ -72,9 +72,9 @@ function Section({ icon, title, content, bgColor, textColor, borderNeon }) {
     >
       <div className="flex items-center gap-1.5 mb-1">
         <Icon size={12} className="shrink-0" style={{ color: textColor }} />
-        <span className="text-[10px] font-black tracking-wider uppercase opacity-70" style={{ color: textColor }}>{title}</span>
+        <span className="text-[10px] font-bold tracking-wider uppercase opacity-70" style={{ color: textColor }}>{title}</span>
       </div>
-      <p className="text-sm leading-relaxed whitespace-pre-wrap font-bold text-slate-800" style={{ overflowWrap: 'break-word' }}>
+      <p className="text-sm leading-relaxed whitespace-pre-wrap font-bold text-zinc-800" style={{ overflowWrap: 'break-word' }}>
         {content}
       </p>
     </div>
@@ -116,13 +116,13 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
   return (
     <div
       ref={cardRef}
-      className={`bg-white border border-slate-100 rounded-3xl overflow-hidden mb-3.5 transition-all duration-300 relative ${isPast ? 'opacity-50' : ''} ${
-        expanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.03)] border-slate-200/80' : 'shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-slate-200/40'
+      className={`bg-white border border-zinc-100 rounded-3xl overflow-hidden mb-3.5 transition-all duration-300 relative ${isPast ? 'opacity-50' : ''} ${
+        expanded ? 'shadow-[0_8px_30px_rgba(0,0,0,0.03)] border-zinc-200/80' : 'shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-zinc-200/40'
       }`}
     >
       {/* 今日の場合は上端に美しいアクティビティカラーのグラデーションバー */}
       {isToday && (
-        <div className="h-1 w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+        <div className="h-1 w-full bg-[#007aff]" />
       )}
 
       {/* Card Header — クリックで展開 */}
@@ -133,30 +133,30 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
             {/* Date + status badges */}
             <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {(!isScheduleView || (!(item.type === 'event' || item.type === 'record' || matchName))) && (
-                <p className={`text-[15px] font-black leading-tight ${isPast ? 'text-slate-400' : 'text-slate-800'}`}>
+                <p className={`text-[15px] font-bold leading-tight ${isPast ? 'text-zinc-400' : 'text-zinc-800'}`}>
                   {formatDate(item.date, item.dayOfWeek, item.displayDate)}
                 </p>
               )}
               {isToday && (
-                <span className="text-[9px] font-black px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full border border-blue-100 uppercase tracking-wider">今日</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-[#007aff] rounded-full border border-blue-100 uppercase tracking-wider">今日</span>
               )}
               {isNext && (
-                <span className="text-[9px] font-black px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full border border-indigo-100 uppercase tracking-wider">次の予定</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-[#007aff]/10 text-[#007aff] rounded-full uppercase tracking-wider">次の予定</span>
               )}
               {item.type === 'event' && (
-                 <span className="text-[9px] font-black px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full border border-orange-100 uppercase tracking-wider">大会・行事</span>
+                 <span className="text-[10px] font-bold px-2 py-0.5 bg-orange-50 text-orange-600 rounded-full border border-orange-100 uppercase tracking-wider">大会・行事</span>
                )}
                {item.type === 'record' && (
-                 <span className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">記録会</span>
+                 <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full border border-emerald-100 uppercase tracking-wider">記録会</span>
                )}
               {matchName && !item.type && (
-                <span className="text-[9px] font-black px-2 py-0.5 bg-red-50 text-red-600 rounded-full border border-red-100 uppercase tracking-wider">試合</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-red-50 text-red-600 rounded-full border border-red-100 uppercase tracking-wider">試合</span>
               )}
               {isPast && (
-                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-100 text-slate-400 rounded-full border border-slate-200/50 uppercase tracking-wider">終了</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-zinc-100 text-zinc-400 rounded-full border border-zinc-200/50 uppercase tracking-wider">終了</span>
               )}
               {isScheduleView && (item.type === 'event' || item.type === 'record' || matchName) && (
-                <span className="text-[9px] font-black px-2 py-0.5 bg-slate-50 border border-slate-100 text-slate-500 rounded-full">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-zinc-50 border border-zinc-100 text-zinc-500 rounded-full">
                   {formatDate(item.date, item.dayOfWeek, item.displayDate)}
                 </span>
               )}
@@ -164,7 +164,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
 
             {/* Title / Name (条件出し分け) */}
              {(item.type === 'event' || item.type === 'record' || matchName) && (
-               <h3 className={`${isScheduleView ? 'text-[17px]' : 'text-[15px]'} font-black leading-tight mb-2.5 ${
+               <h3 className={`${isScheduleView ? 'text-[17px]' : 'text-[15px]'} font-bold leading-tight mb-2.5 ${
                  item.type === 'event' ? 'text-orange-600' : 
                  item.type === 'record' ? 'text-emerald-600' : 
                  'text-orange-600'
@@ -185,17 +185,17 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
                 </span>
               )}
               {displayTime && !item.type && (
-                <span className="inline-flex items-center gap-1 text-[10px] text-slate-500 font-bold">
-                  <Clock size={10} className="text-slate-400" />
+                <span className="inline-flex items-center gap-1 text-[10px] text-zinc-500 font-bold">
+                  <Clock size={10} className="text-zinc-400" />
                   {displayTime}
                 </span>
               )}
 
               {item.type === 'record' && item.entryPeriod && (
-                <span className={`inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded border ${
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
                     item.entryStatus === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                    item.entryStatus === 'upcoming' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
-                    'bg-slate-50 text-slate-400 border-slate-100'
+                    item.entryStatus === 'upcoming' ? 'bg-blue-50 text-[#007aff] border-blue-100' : 
+                    'bg-zinc-50 text-zinc-400 border-zinc-100'
                 }`}>
                   {item.entryStatus === 'active' ? '募集中: ' : item.entryStatus === 'upcoming' ? '予告: ' : '受付終了: '}
                   {item.entryPeriod}
@@ -205,7 +205,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
           </div>
 
           {/* Chevron */}
-          <div className="shrink-0 mt-1 p-1 rounded-full text-slate-400 active:text-slate-600">
+          <div className="shrink-0 mt-1 p-1 rounded-full text-zinc-400 active:text-zinc-600">
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
         </div>
@@ -213,7 +213,7 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
 
       {/* Expanded Content */}
       {expanded && (
-        <div className="px-4.5 pb-4.5 border-t border-slate-50">
+        <div className="px-4.5 pb-4.5 border-t border-zinc-50">
           <div className="pt-3">
             {item.type === 'record' ? (
               <Section icon={Clock} title="エントリー期間" content={item.entryPeriod} bgColor="rgba(245, 158, 11, 0.05)" textColor="#d97706" borderNeon="#f59e0b" />
@@ -231,25 +231,25 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
 
             {/* 場所・アクセス (アコーディオン内のロケーション詳細) */}
             {item.location && locationDetails[actualLocation] && (
-              <div className="mt-3.5 p-3.5 rounded-2xl border border-slate-100 bg-slate-50/50">
+              <div className="mt-3.5 p-3.5 rounded-2xl border border-zinc-100 bg-zinc-50/50">
                 <div className="flex items-center gap-1.5 mb-2">
                   <MapPin size={12} className="opacity-70" style={{ color: loc.border }} />
-                  <span className="text-[9px] font-black tracking-wider uppercase opacity-60 text-slate-500">アクセス情報</span>
+                  <span className="text-[10px] font-bold tracking-wider uppercase opacity-60 text-zinc-500">アクセス情報</span>
                 </div>
                 
-                <div className="text-xs text-slate-600 leading-relaxed mb-3">
-                  <p className="font-black text-[13px] text-slate-800 mb-1">{locationDetails[actualLocation].name}</p>
+                <div className="text-xs text-zinc-600 leading-relaxed mb-3">
+                  <p className="font-bold text-[13px] text-zinc-800 mb-1">{locationDetails[actualLocation].name}</p>
                   {locationDetails[actualLocation].access?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-1.5">
                       {locationDetails[actualLocation].access.map((acc, i) => (
-                        <p key={i} className="text-slate-500 text-[10px] bg-white px-2 py-0.5 rounded-md border border-slate-100 font-bold">
+                        <p key={i} className="text-zinc-500 text-[10px] bg-white px-2 py-0.5 rounded-md border border-zinc-100 font-bold">
                           {acc}
                         </p>
                       ))}
                     </div>
                   )}
                   {locationDetails[actualLocation].fee && (
-                    <p className="text-slate-400 text-[10px] font-bold">
+                    <p className="text-zinc-400 text-[10px] font-bold">
                       料金: {locationDetails[actualLocation].fee}
                     </p>
                   )}
@@ -261,16 +261,16 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
                       href={locationDetails[actualLocation].url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-slate-100 text-slate-700 text-[11px] font-black hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-zinc-100 text-zinc-700 text-[11px] font-bold hover:bg-zinc-50 transition-all shadow-sm active:scale-95"
                     >
-                      <Map size={11} className="text-blue-500" />
+                      <Map size={11} className="text-[#007aff]" />
                       Google Maps
                     </a>
                     <a
                       href={locationDetails[actualLocation].appleUrl || `https://maps.apple.com/?q=${encodeURIComponent(locationDetails[actualLocation].appleQuery || locationDetails[actualLocation].name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-slate-100 text-slate-700 text-[11px] font-black hover:bg-slate-50 transition-all shadow-sm active:scale-95"
+                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl bg-white border border-zinc-100 text-zinc-700 text-[11px] font-bold hover:bg-zinc-50 transition-all shadow-sm active:scale-95"
                     >
                       <MapPin size={11} className="text-emerald-500" />
                       Apple Maps
@@ -290,11 +290,11 @@ function PracticeCard({ item, defaultOpen = false, isToday = false, isNext = fal
 
 function SkeletonCard() {
   return (
-    <div className="bg-white border border-slate-100 rounded-3xl px-4.5 py-4 mb-3.5 animate-pulse">
-      <div className="h-4 w-32 bg-slate-100 rounded-full mb-3" />
+    <div className="bg-white border border-zinc-100 rounded-3xl px-4.5 py-4 mb-3.5 animate-pulse">
+      <div className="h-4 w-32 bg-zinc-100 rounded-full mb-3" />
       <div className="flex gap-2">
-        <div className="h-5 w-24 bg-slate-100 rounded-full" />
-        <div className="h-5 w-14 bg-slate-100 rounded-full" />
+        <div className="h-5 w-24 bg-zinc-100 rounded-full" />
+        <div className="h-5 w-14 bg-zinc-100 rounded-full" />
       </div>
     </div>
   );
@@ -304,8 +304,8 @@ function SkeletonCard() {
 
 function TabLoadingFallback() {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-      <div className="w-6 h-6 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+    <div className="flex flex-col items-center justify-center py-20 text-zinc-400 gap-3">
+      <div className="w-6 h-6 border-2 border-zinc-200 border-t-[#007aff] rounded-full animate-spin" />
       <p className="text-xs font-bold">読み込み中...</p>
     </div>
   );
@@ -316,9 +316,9 @@ function TabLoadingFallback() {
 function SectionDivider({ label }) {
   return (
     <div className="flex items-center gap-3 my-4 px-1 animate-fade-in">
-      <div className="flex-1 h-px bg-slate-100" />
-      <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase">{label}</span>
-      <div className="flex-1 h-px bg-slate-100" />
+      <div className="flex-1 h-px bg-zinc-100" />
+      <span className="text-[10px] text-zinc-400 font-bold tracking-widest uppercase">{label}</span>
+      <div className="flex-1 h-px bg-zinc-100" />
     </div>
   );
 }
@@ -670,15 +670,15 @@ export default function App() {
     return result;
   })();
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 flex flex-col pb-24">
+    <div className="min-h-screen bg-[#f2f2f7] text-zinc-800 flex flex-col pb-24">
 
       {/* ── 📱 Header ── (一切の帯を省いたスマートヘッダー、PWAステータスバーSafe Area対応) */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-zinc-100 px-4 pt-[calc(env(safe-area-inset-top,0px)+14px)] pb-3.5 shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div>
-              <h1 className="text-sm font-black text-slate-800 tracking-tight leading-none">TUAT RUNNING STATS</h1>
-              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider leading-none mt-1.5 block">TRACK & FIELD</span>
+              <h1 className="text-sm font-bold text-zinc-800 tracking-tight leading-none">TUAT RUNNING STATS</h1>
+              <span className="text-[10px] text-zinc-400 font-extrabold tracking-wider leading-none mt-1.5 block">TRACK & FIELD</span>
             </div>
           </div>
           
@@ -686,7 +686,7 @@ export default function App() {
           <button 
             onClick={handleManualRefresh}
             disabled={loading}
-            className={`p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-800 transition-colors shadow-sm ${loading ? 'animate-spin opacity-50' : ''}`}
+            className={`p-2 rounded-xl bg-zinc-50 border border-zinc-100 text-zinc-500 hover:text-zinc-800 transition-colors shadow-sm ${loading ? 'animate-spin opacity-50' : ''}`}
             title="データを同期"
             aria-label="データを同期"
           >
@@ -703,17 +703,17 @@ export default function App() {
           <div className="space-y-4">
             
             {/* 月選択 セグメンテッドコントロール (iOS仕様) */}
-            <div className="bg-slate-100/70 p-0.5 rounded-2xl flex w-full relative">
+            <div className="bg-zinc-100/70 p-0.5 rounded-2xl flex w-full relative">
               {visibleMonthChips.map(m => {
                 const isActive = activeMonth === m;
                 return (
                   <button
                     key={m}
                     onClick={() => handleMonthChange(m)}
-                    className={`flex-1 py-2 text-center rounded-xl text-[11px] font-black transition-all relative z-10 duration-200 select-none ${
+                    className={`flex-1 py-2 text-center rounded-xl text-[11px] font-bold transition-all relative z-10 duration-200 select-none ${
                       isActive 
-                        ? 'bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)]' 
-                        : 'text-slate-500 hover:text-slate-800'
+                        ? 'bg-white text-zinc-800 shadow-[0_2px_8px_rgba(0,0,0,0.06)]' 
+                        : 'text-zinc-500 hover:text-zinc-800'
                     }`}
                   >
                     <span className="inline-flex items-center justify-center gap-1">
@@ -732,10 +732,10 @@ export default function App() {
                   setShowCalendar(!showCalendar);
                   setShowLocations(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-black transition-all border ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-bold transition-all border ${
                   showCalendar 
-                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-inner' 
-                    : 'bg-white border-slate-100 text-slate-600'
+                    ? 'bg-blue-50 border-blue-200 text-[#007aff] shadow-inner' 
+                    : 'bg-white border-zinc-100 text-zinc-600'
                 }`}
               >
                 <CalendarIcon size={13} />
@@ -747,10 +747,10 @@ export default function App() {
                   setShowLocations(!showLocations);
                   setShowCalendar(false);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-black transition-all border ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-xs font-bold transition-all border ${
                   showLocations 
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-600 shadow-inner' 
-                    : 'bg-white border-slate-100 text-slate-600'
+                    : 'bg-white border-zinc-100 text-zinc-600'
                 }`}
               >
                 <MapPin size={13} />
@@ -779,15 +779,15 @@ export default function App() {
 
             {/* 日程一覧用のカテゴリースイッチ */}
             {isScheduleView && (
-              <div className="flex bg-slate-100 p-0.5 rounded-2xl border border-slate-200 shadow-inner">
+              <div className="flex bg-zinc-100 p-0.5 rounded-2xl border border-zinc-200 shadow-inner">
                 {['大会・行事', '記録会'].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setScheduleCategory(cat)}
-                    className={`flex-1 py-2 text-xs font-black rounded-xl transition-all ${
+                    className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                       scheduleCategory === cat 
-                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200/50' 
-                        : 'text-slate-400 active:text-slate-600'
+                        ? 'bg-white text-zinc-800 shadow-sm border border-zinc-200/50' 
+                        : 'text-zinc-400 active:text-zinc-600'
                     }`}
                   >
                     {cat}
@@ -802,8 +802,8 @@ export default function App() {
                 {[0, 1, 2, 3].map(i => <SkeletonCard key={i} />)}
               </div>
             ) : !hasContent ? (
-              <div className="text-center py-16 text-slate-400 border border-dashed border-slate-200 rounded-3xl bg-white">
-                <CalendarDays size={32} className="mx-auto mb-2 opacity-25 text-slate-300" />
+              <div className="text-center py-16 text-zinc-400 border border-dashed border-zinc-200 rounded-3xl bg-white">
+                <CalendarDays size={32} className="mx-auto mb-2 opacity-25 text-zinc-300" />
                 <p className="text-sm font-bold">この月の予定はありません</p>
               </div>
             ) : isScheduleView ? (
@@ -923,7 +923,7 @@ export default function App() {
       {/* 同期完了トースト */}
       {toast && (
         <div className="fixed inset-x-0 bottom-28 z-50 flex justify-center pointer-events-none animate-fade-in">
-          <span className="px-4 py-2 rounded-full bg-slate-800/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm">
+          <span className="px-4 py-2 rounded-full bg-zinc-800/90 text-white text-xs font-bold shadow-lg backdrop-blur-sm">
             {toast}
           </span>
         </div>

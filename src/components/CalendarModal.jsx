@@ -86,22 +86,22 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
     }
 
     return (
-        <div className="bg-white rounded-3xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.02)] border border-slate-100 w-full animate-fade-in">
+        <div className="bg-white rounded-3xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.02)] border border-zinc-100 w-full animate-fade-in">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 pt-5 pb-3 border-b border-slate-50 shrink-0">
+            <div className="flex items-center justify-between px-4 pt-5 pb-3 border-b border-zinc-50 shrink-0">
                 <div className="relative">
                     <button 
                         onClick={() => setShowMonthSelector(!showMonthSelector)}
-                        className="flex items-center gap-1.5 text-sm font-black text-slate-800 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-all"
+                        className="flex items-center gap-1.5 text-sm font-bold text-zinc-800 px-3.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-100 hover:bg-zinc-100 transition-all"
                     >
                         {viewYear}年 {viewMonth + 1}月
-                        <ChevronDown size={13} className="text-slate-400 transition-transform duration-200" />
+                        <ChevronDown size={13} className="text-zinc-400 transition-transform duration-200" />
                     </button>
                     
                     {showMonthSelector && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setShowMonthSelector(false)} />
-                            <div className="absolute top-full left-0 mt-1 w-44 bg-white rounded-2xl shadow-xl border border-slate-100 z-25 py-1.5 overflow-hidden animate-fade-in">
+                            <div className="absolute top-full left-0 mt-1 w-44 bg-white rounded-2xl shadow-xl border border-zinc-100 z-25 py-1.5 overflow-hidden animate-fade-in">
                                 <div className="max-h-52 overflow-y-auto">
                                     {availableMonths.map(item => (
                                         <button
@@ -112,7 +112,7 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                                                 setShowMonthSelector(false);
                                             }}
                                             className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors
-                                                ${viewYear === item.y && viewMonth === item.m ? 'bg-blue-50 text-blue-600 font-extrabold' : 'text-slate-600 hover:bg-slate-50'}
+                                                ${viewYear === item.y && viewMonth === item.m ? 'bg-blue-50 text-[#007aff] font-extrabold' : 'text-zinc-600 hover:bg-zinc-50'}
                                             `}
                                         >
                                             {item.label}
@@ -123,7 +123,7 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                         </>
                     )}
                 </div>
-                <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase">カレンダー</span>
+                <span className="text-[10px] text-zinc-400 font-bold tracking-widest uppercase">カレンダー</span>
             </div>
 
             {/* Grid */}
@@ -131,7 +131,7 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                 {/* Weekdays */}
                 <div className="grid grid-cols-7 mb-1.5">
                     {WEEKDAYS.map((w, i) => (
-                        <div key={w} className={`text-center text-[10px] font-black py-1 tracking-wider ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-slate-400'}`}>
+                        <div key={w} className={`text-center text-[10px] font-bold py-1 tracking-wider ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-zinc-400'}`}>
                             {w}
                         </div>
                     ))}
@@ -147,7 +147,7 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                         const isToday = ds === todayStr;
                         const dow = (firstDow + d - 1) % 7;
                         
-                        let hoverClass = 'active:bg-slate-50';
+                        let hoverClass = 'active:bg-zinc-50';
                         if (info?.hasEvent) hoverClass = 'active:bg-orange-50';
                         else if (info?.hasRecord) hoverClass = 'active:bg-emerald-50';
                         else if (info?.hasPractice) hoverClass = 'active:bg-blue-50';
@@ -160,14 +160,14 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                                   ${hasActivities ? 'cursor-pointer ' + hoverClass : 'cursor-default opacity-30'}
                                 `}
                             >
-                                <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-black transition-all
+                                <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold transition-all
                                   ${isToday 
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/10' 
+                                    ? 'bg-[#007aff] text-white shadow-md shadow-[#007aff]/20' 
                                     : dow === 0 
                                       ? 'text-red-500' 
                                       : dow === 6 
-                                        ? 'text-blue-600' 
-                                        : 'text-slate-700'
+                                        ? 'text-[#007aff]' 
+                                        : 'text-zinc-700'
                                   }
                                 `}>
                                     {d}
@@ -176,7 +176,7 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                                 <div className="flex flex-col items-center w-full flex-1 min-h-0 mt-1">
                                     <div className="flex items-center justify-center gap-1 mt-auto pb-0.5">
                                         {info?.hasPractice && (
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]" />
                                         )}
                                         {info?.hasEvent && (
                                             <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
@@ -192,9 +192,9 @@ export default function CalendarModal({ sessions, onSelectDate, activeMonthStr, 
                 </div>
 
                 {/* Legend */}
-                <div className="flex items-center justify-center gap-4 px-3 pt-3.5 border-t border-slate-50 text-[9px] text-slate-400 font-black tracking-widest uppercase">
+                <div className="flex items-center justify-center gap-4 px-3 pt-3.5 border-t border-zinc-50 text-[10px] text-zinc-400 font-bold tracking-widest uppercase">
                     <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#007aff]" />
                         練習
                     </div>
                     <div className="flex items-center gap-1.5">

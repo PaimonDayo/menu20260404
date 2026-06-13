@@ -85,18 +85,18 @@ const TimelineRecordFields = ({ rec, focusKey = 'total' }) => {
         <div className="flex flex-wrap gap-1.5">
           {items.map(item => {
             const color = item.key === 'strides'
-              ? { hex: '#64748b', bg: '#f8fafc', text: '#475569', border: '#e2e8f0' }
+              ? { hex: '#64748b', bg: '#f2f2f7', text: '#475569', border: '#e2e8f0' }
               : INTENSITY_COLORS[item.key];
             const isFocused = focusKey === 'total' || focusKey === item.key || item.key === 'strides';
             return (
               <span
                 key={item.key}
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-black transition-opacity ${isFocused ? 'opacity-100' : 'opacity-45'}`}
+                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-bold transition-opacity ${isFocused ? 'opacity-100' : 'opacity-45'}`}
                 style={{ backgroundColor: color.bg, borderColor: color.border }}
               >
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color.hex }} />
                 <span style={{ color: color.text }}>{item.label}</span>
-                <span className="text-slate-800">{item.value}{item.unit}</span>
+                <span className="text-zinc-800">{item.value}{item.unit}</span>
               </span>
             );
           })}
@@ -104,23 +104,23 @@ const TimelineRecordFields = ({ rec, focusKey = 'total' }) => {
       )}
 
       {rec.reinforce && (
-        <div className="rounded-2xl bg-[#f2f2f7] border border-slate-100 px-3 py-2">
-          <div className="text-[9px] font-black text-slate-400 leading-none">補強(ウェイト)</div>
-          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-700 whitespace-pre-wrap">{rec.reinforce}</div>
+        <div className="rounded-2xl bg-[#f2f2f7] border border-zinc-100 px-3 py-2">
+          <div className="text-[10px] font-bold text-zinc-400 leading-none">補強(ウェイト)</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-zinc-700 whitespace-pre-wrap">{rec.reinforce}</div>
         </div>
       )}
 
       {rec.result && (
-        <div className="rounded-2xl bg-blue-50/60 border border-blue-100 px-3 py-2">
-          <div className="text-[9px] font-black text-blue-400 leading-none">結果</div>
-          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-700 whitespace-pre-wrap">{rec.result}</div>
+        <div className="rounded-2xl bg-[#007aff]/5 border border-[#007aff]/10 px-3 py-2">
+          <div className="text-[10px] font-bold text-[#007aff]/70 leading-none">結果</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-zinc-700 whitespace-pre-wrap">{rec.result}</div>
         </div>
       )}
 
       {rec.comment && (
-        <div className="rounded-2xl bg-slate-50/70 border border-slate-100 px-3 py-2">
-          <div className="text-[9px] font-black text-slate-400 leading-none">感想</div>
-          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-slate-600 whitespace-pre-wrap">{rec.comment}</div>
+        <div className="rounded-2xl bg-zinc-50/70 border border-zinc-100 px-3 py-2">
+          <div className="text-[10px] font-bold text-zinc-400 leading-none">感想</div>
+          <div className="mt-1.5 text-[11px] font-bold leading-relaxed text-zinc-600 whitespace-pre-wrap">{rec.comment}</div>
         </div>
       )}
     </div>
@@ -912,10 +912,10 @@ export default function StatsDashboard({
         onClick={() => handleToggleReaction(memberName, rec.date, item.type)}
         disabled={reactionSubmittingKey === submitKey}
         aria-label={item.label}
-        className={`h-7 min-w-7 px-2 rounded-full border text-[10px] font-black transition-all active:scale-95 inline-flex items-center justify-center gap-1 ${
+        className={`h-7 min-w-7 px-2 rounded-full border text-[10px] font-bold transition-all active:scale-95 inline-flex items-center justify-center gap-1 ${
           mine
             ? 'bg-rose-50 border-rose-100 text-rose-500'
-            : 'bg-[#f2f2f7] border-slate-100 text-slate-400'
+            : 'bg-[#f2f2f7] border-zinc-100 text-zinc-400'
         }`}
       >
         <Heart size={13} fill={mine ? 'currentColor' : 'none'} />
@@ -941,7 +941,7 @@ export default function StatsDashboard({
         <div className="flex items-center justify-end gap-1.5">
           {alwaysExpanded || !allowReplyInput ? (
             replyCount > 0 && (
-              <span className="h-7 px-2.5 rounded-full bg-[#f2f2f7] text-[#007aff] text-[10px] font-black inline-flex items-center">
+              <span className="h-7 px-2.5 rounded-full bg-[#f2f2f7] text-[#007aff] text-[10px] font-bold inline-flex items-center">
                 リプライ {replyCount}
               </span>
             )
@@ -949,10 +949,10 @@ export default function StatsDashboard({
             <button
               type="button"
               onClick={() => setExpandedFeedbackKeys(prev => ({ ...prev, [key]: !expanded }))}
-              className={`h-7 px-2.5 rounded-full text-[10px] font-black transition-all active:scale-95 ${
+              className={`h-7 px-2.5 rounded-full text-[10px] font-bold transition-all active:scale-95 ${
                 expanded || replyCount > 0
                   ? 'bg-[#f2f2f7] text-[#007aff]'
-                  : 'bg-transparent text-slate-400'
+                  : 'bg-transparent text-zinc-400'
               }`}
             >
               {replyCount > 0 ? `リプライ ${replyCount}` : 'リプライ'}
@@ -966,7 +966,7 @@ export default function StatsDashboard({
             {showReplies && (
               <div className="space-y-1.5 pl-2 border-l-2 border-[#f2f2f7]">
                 {rec.replies.map((reply, replyIdx) => (
-                  <p key={replyIdx} className="text-[10px] leading-relaxed text-slate-500 bg-[#f2f2f7]/70 rounded-2xl px-3 py-2">{reply}</p>
+                  <p key={replyIdx} className="text-[10px] leading-relaxed text-zinc-500 bg-[#f2f2f7]/70 rounded-2xl px-3 py-2">{reply}</p>
                 ))}
               </div>
             )}
@@ -977,7 +977,7 @@ export default function StatsDashboard({
                   value={replyDrafts[key] || ''}
                   onChange={(e) => setReplyDrafts(prev => ({ ...prev, [key]: e.target.value }))}
                   placeholder="リプライ"
-                  className="flex-1 min-w-0 px-3 py-2 rounded-full bg-[#f2f2f7] text-[11px] font-bold text-slate-700 focus:outline-none"
+                  className="flex-1 min-w-0 px-3 py-2 rounded-full bg-[#f2f2f7] text-[11px] font-bold text-zinc-700 focus:outline-none"
                 />
                 <button
                   type="button"
@@ -1424,13 +1424,13 @@ export default function StatsDashboard({
   // ローディングとエラーの表示
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-slate-400 gap-4 bg-white border border-slate-100 rounded-3xl mx-3 my-8 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+      <div className="flex flex-col items-center justify-center p-12 text-zinc-400 gap-4 bg-white border border-zinc-100 rounded-3xl mx-3 my-8 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
         <div className="relative w-10 h-10">
-          <div className="absolute inset-0 border-3 border-slate-100 rounded-full" />
-          <div className="absolute inset-0 border-3 border-t-blue-500 rounded-full animate-spin" />
+          <div className="absolute inset-0 border-3 border-zinc-100 rounded-full" />
+          <div className="absolute inset-0 border-3 border-t-[#007aff] rounded-full animate-spin" />
         </div>
         <div className="text-center space-y-1">
-          <p className="font-extrabold text-sm text-slate-800">同期中</p>
+          <p className="font-extrabold text-sm text-zinc-800">同期中</p>
         </div>
       </div>
     );
@@ -1440,11 +1440,11 @@ export default function StatsDashboard({
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center bg-white border border-red-100 rounded-3xl mx-3 my-8 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
         <AlertCircle size={32} className="text-red-500 mb-2 animate-bounce" />
-        <p className="font-extrabold text-sm text-slate-800">同期に失敗しました</p>
-        <p className="text-[10px] text-slate-400 mt-1">{error}</p>
+        <p className="font-extrabold text-sm text-zinc-800">同期に失敗しました</p>
+        <p className="text-[10px] text-zinc-400 mt-1">{error}</p>
         <button 
           onClick={() => fetchAndParseData(true)}
-          className="mt-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs font-black text-blue-600 active:scale-95 transition-all shadow-sm"
+          className="mt-4 px-4 py-2.5 bg-blue-50 border border-blue-100 rounded-xl text-xs font-bold text-[#007aff] active:scale-95 transition-all shadow-sm"
         >
           更新
         </button>
@@ -1462,18 +1462,18 @@ export default function StatsDashboard({
                 <div className="w-6 h-6 rounded-lg bg-[#f2f2f7] flex items-center justify-center text-[#007aff]">
                   <Activity size={13} />
                 </div>
-                <h3 className="text-sm font-black text-slate-800">最近</h3>
+                <h3 className="text-sm font-bold text-zinc-800">最近</h3>
               </div>
-              <span className="text-[10px] font-black text-slate-400">{latestSocialRecords.length}件</span>
+              <span className="text-[10px] font-bold text-zinc-400">{latestSocialRecords.length}件</span>
             </div>
 
             <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap py-1 scrollbar-none">
               <button
                 onClick={() => setLatestGrade('')}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${
                   latestGrade === ''
-                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
-                    : 'bg-slate-50/60 border-slate-100/80 text-slate-500'
+                    ? 'bg-blue-50 border-blue-200 text-[#007aff] shadow-sm'
+                    : 'bg-zinc-50/60 border-zinc-100/80 text-zinc-500'
                 }`}
               >
                 すべて
@@ -1482,10 +1482,10 @@ export default function StatsDashboard({
                 <button
                   key={g}
                   onClick={() => setLatestGrade(g)}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${
                     latestGrade === g
-                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm'
-                      : 'bg-slate-50/60 border-slate-100/80 text-slate-500'
+                      ? 'bg-blue-50 border-blue-200 text-[#007aff] shadow-sm'
+                      : 'bg-zinc-50/60 border-zinc-100/80 text-zinc-500'
                   }`}
                 >
                   {g}
@@ -1494,7 +1494,7 @@ export default function StatsDashboard({
             </div>
 
             {latestSocialRecords.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 text-xs font-bold bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+              <div className="text-center py-10 text-zinc-400 text-xs font-bold bg-zinc-50/50 rounded-2xl border border-dashed border-zinc-100">
                 表示できる記録がありません
               </div>
             ) : (
@@ -1504,7 +1504,7 @@ export default function StatsDashboard({
                   return (
                     <div
                       key={`${rec.memberName}-${rec.date}-${idx}`}
-                      className="rounded-2xl bg-white border border-slate-100 overflow-hidden"
+                      className="rounded-2xl bg-white border border-zinc-100 overflow-hidden"
                     >
                       <button
                         type="button"
@@ -1513,18 +1513,18 @@ export default function StatsDashboard({
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <span className="inline-flex items-center gap-1 text-[9px] text-slate-400 font-black leading-none">
+                            <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400 font-bold leading-none">
                               <Calendar size={10} />
                               {dateText}
                             </span>
-                            <span className="flex items-center gap-1 text-xs font-black text-slate-800 mt-1 truncate">
-                              <User size={11} className="text-slate-300 shrink-0" />
+                            <span className="flex items-center gap-1 text-xs font-bold text-zinc-800 mt-1 truncate">
+                              <User size={11} className="text-zinc-300 shrink-0" />
                               <span className="truncate">{formatMemberName(rec.memberName)}</span>
                             </span>
                           </div>
-                          <span className="inline-flex items-center gap-1 text-xs font-black text-[#007aff] shrink-0">
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-[#007aff] shrink-0">
                             <Activity size={13} />
-                            {rec.total || 0}<span className="text-[8px] text-slate-400 ml-0.5">km</span>
+                            {rec.total || 0}<span className="text-[10px] text-zinc-400 ml-0.5">km</span>
                           </span>
                         </div>
                         <TimelineRecordFields rec={rec} focusKey="total" />
@@ -1544,13 +1544,13 @@ export default function StatsDashboard({
       {showSection === 'ranking' && !rankingDetailMember && (
         <div className="space-y-4">
           {/* 🏆 ランキングカード */}
-          <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-4">
+          <div className="bg-white border border-zinc-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-500">
+                <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#007aff]">
                   <Trophy size={13} />
                 </div>
-                <h3 className="text-sm font-black text-slate-800">走行距離ランキング</h3>
+                <h3 className="text-sm font-bold text-zinc-800">走行距離ランキング</h3>
               </div>
               
               <div className="flex items-center gap-1.5">
@@ -1561,16 +1561,16 @@ export default function StatsDashboard({
                       e.stopPropagation();
                       setActiveDropdown(activeDropdown === 'period' ? null : 'period');
                     }}
-                    className="flex items-center gap-1 bg-slate-50 border border-slate-100 rounded-xl px-3 py-1.5 text-[10px] font-black text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-all shadow-sm"
+                    className="flex items-center gap-1 bg-zinc-50 border border-zinc-100 rounded-xl px-3 py-1.5 text-[10px] font-bold text-zinc-600 hover:bg-zinc-100 hover:text-zinc-800 transition-all shadow-sm"
                   >
                     <span>{PERIODS[period]}</span>
-                    <ChevronDown size={11} className={`text-slate-400 transition-transform ${activeDropdown === 'period' ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={11} className={`text-zinc-400 transition-transform ${activeDropdown === 'period' ? 'rotate-180' : ''}`} />
                   </button>
                 
                 {activeDropdown === 'period' && (
                   <>
                     <div className="fixed inset-0 z-20" onClick={() => setActiveDropdown(null)} />
-                    <div className="absolute top-[calc(100%+4px)] right-0 w-36 bg-white border border-slate-100 rounded-2xl shadow-xl py-1.5 z-25 animate-fade-in">
+                    <div className="absolute top-[calc(100%+4px)] right-0 w-36 bg-white border border-zinc-100 rounded-2xl shadow-xl py-1.5 z-25 animate-fade-in">
                       {Object.entries(PERIODS).map(([k, v]) => (
                         <button
                           key={k}
@@ -1579,7 +1579,7 @@ export default function StatsDashboard({
                             setActiveDropdown(null);
                           }}
                           className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${
-                            period === k ? 'bg-blue-50 text-blue-600 font-extrabold' : 'text-slate-600 hover:bg-slate-50'
+                            period === k ? 'bg-blue-50 text-[#007aff] font-extrabold' : 'text-zinc-600 hover:bg-zinc-50'
                           }`}
                         >
                           {v}
@@ -1593,7 +1593,7 @@ export default function StatsDashboard({
           </div>
 
             {/* ソートボタン（タブ） */}
-            <div className="flex bg-slate-50 p-0.5 rounded-xl text-[9px] font-black gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none border border-slate-100">
+            <div className="flex bg-zinc-50 p-0.5 rounded-xl text-[10px] font-bold gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-none border border-zinc-100">
               {[
                 { key: 'total', label: '総距離' },
                 { key: 'jog', label: 'jog' },
@@ -1605,7 +1605,7 @@ export default function StatsDashboard({
                   key={item.key}
                   onClick={() => setSortKey(item.key)}
                   className={`flex-1 py-2 px-3 rounded-lg transition-all ${
-                    sortKey === item.key ? 'bg-white text-blue-600 shadow-sm border border-slate-100 font-black' : 'text-slate-400 hover:text-slate-600'
+                    sortKey === item.key ? 'bg-white text-[#007aff] shadow-sm border border-zinc-100 font-bold' : 'text-zinc-400 hover:text-zinc-600'
                   }`}
                 >
                   {item.label}
@@ -1614,16 +1614,16 @@ export default function StatsDashboard({
             </div>
 
             {/* 学年別フィルターチップス（横スクロール） */}
-            <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap py-1 scrollbar-none border-b border-slate-50">
+            <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap py-1 scrollbar-none border-b border-zinc-50">
               <button
                 onClick={() => {
                   setRankingGrade('');
                   setShowAllRanking(false);
                 }}
-                className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${
                   rankingGrade === ''
-                    ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm font-black'
-                    : 'bg-slate-50/60 border-slate-100/80 text-slate-500 hover:bg-slate-100'
+                    ? 'bg-blue-50 border-blue-200 text-[#007aff] shadow-sm font-bold'
+                    : 'bg-zinc-50/60 border-zinc-100/80 text-zinc-500 hover:bg-zinc-100'
                 }`}
               >
                 すべて
@@ -1635,10 +1635,10 @@ export default function StatsDashboard({
                     setRankingGrade(g);
                     setShowAllRanking(false);
                   }}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black border transition-all active:scale-95 ${
+                  className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 ${
                     rankingGrade === g
-                      ? 'bg-blue-50 border-blue-200 text-blue-600 shadow-sm font-black'
-                      : 'bg-slate-50/60 border-slate-100/80 text-slate-500 hover:bg-slate-100'
+                      ? 'bg-blue-50 border-blue-200 text-[#007aff] shadow-sm font-bold'
+                      : 'bg-zinc-50/60 border-zinc-100/80 text-zinc-500 hover:bg-zinc-100'
                   }`}
                 >
                   {g}
@@ -1651,7 +1651,7 @@ export default function StatsDashboard({
 
             {/* ランキングリスト (絶対物理スケール・ブレない基準表示) */}
             {rankingData.length === 0 ? (
-              <div className="text-center py-12 text-slate-400 text-xs font-bold bg-slate-50/50 rounded-2xl border border-dashed border-slate-100">
+              <div className="text-center py-12 text-zinc-400 text-xs font-bold bg-zinc-50/50 rounded-2xl border border-dashed border-zinc-100">
                 選択した期間のデータはありません
               </div>
             ) : (
@@ -1659,14 +1659,14 @@ export default function StatsDashboard({
                 {/* 背景絶対グリッド線 */}
                 <div className="absolute inset-0 pl-[38px] pr-2 pointer-events-none flex justify-between z-0">
                   {rankingScale.ticks.map((tick, idx) => (
-                    <div key={idx} className="h-full border-r border-dashed border-slate-100 relative">
+                    <div key={idx} className="h-full border-r border-dashed border-zinc-100 relative">
                       {/* 目盛り値の表示 */}
                     </div>
                   ))}
                 </div>
 
                 {/* リストの上部にグリッドの目盛りラベルを表示 */}
-                <div className="flex justify-between pl-[38px] pr-2 text-[8px] font-extrabold text-slate-400 uppercase tracking-widest pb-1 border-b border-slate-50">
+                <div className="flex justify-between pl-[38px] pr-2 text-[10px] font-extrabold text-zinc-400 uppercase tracking-widest pb-1 border-b border-zinc-50">
                   {rankingScale.ticks.map((tick, idx) => (
                     <span key={idx} className="text-center w-6 shrink-0 block">{tick}</span>
                   ))}
@@ -1679,11 +1679,11 @@ export default function StatsDashboard({
 
                   const badgeBg = isTop3 
                     ? (index === 0 
-                        ? 'bg-amber-100 border-amber-200 text-amber-800 font-black' 
+                        ? 'bg-amber-100 border-amber-200 text-amber-800 font-bold' 
                         : index === 1 
-                          ? 'bg-slate-100 border-slate-200 text-slate-700 font-black' 
-                          : 'bg-orange-100 border-orange-200 text-orange-800 font-black')
-                    : 'bg-slate-50 border-slate-100 text-slate-400 font-bold';
+                          ? 'bg-zinc-100 border-zinc-200 text-zinc-700 font-bold' 
+                          : 'bg-orange-100 border-orange-200 text-orange-800 font-bold')
+                    : 'bg-zinc-50 border-zinc-100 text-zinc-400 font-bold';
                   const badgeIcon = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
 
                   // 強度の構成割合
@@ -1702,7 +1702,7 @@ export default function StatsDashboard({
                       onClick={() => {
                         setRankingDetailMember(item.name);
                       }}
-                      className="w-full flex items-center gap-2.5 p-2 bg-slate-50/30 border border-slate-100/50 rounded-2xl shadow-inner relative z-10 text-left cursor-pointer hover:bg-blue-50/20 active:scale-[0.99] transition-all"
+                      className="w-full flex items-center gap-2.5 p-2 bg-zinc-50/30 border border-zinc-100/50 rounded-2xl shadow-inner relative z-10 text-left cursor-pointer hover:bg-blue-50/20 active:scale-[0.99] transition-all"
                     >
                       {/* 順位バッジ */}
                       <div className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 text-xs border ${badgeBg}`}>
@@ -1711,19 +1711,19 @@ export default function StatsDashboard({
                       
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-baseline mb-1 gap-2">
-                          <h4 className="text-xs font-black text-slate-800 truncate flex-1 min-w-0">
+                          <h4 className="text-xs font-bold text-zinc-800 truncate flex-1 min-w-0">
                             {formatMemberName(item.name)}
                           </h4>
-                          <p className="text-xs font-black text-blue-600 shrink-0 whitespace-nowrap ml-auto">
-                            {totalVal}<span className="text-[8px] text-slate-400 font-bold ml-0.5">km</span>
+                          <p className="text-xs font-bold text-[#007aff] shrink-0 whitespace-nowrap ml-auto">
+                            {totalVal}<span className="text-[10px] text-zinc-400 font-bold ml-0.5">km</span>
                             {sortKey !== 'total' && (
-                              <span className="text-[8px] text-slate-400 font-bold ml-1">({item.total}km)</span>
+                              <span className="text-[10px] text-zinc-400 font-bold ml-1">({item.total}km)</span>
                             )}
                           </p>
                         </div>
                         
                         {/* 絶対プログレスバー (グリッド上限に比例した物理幅) */}
-                        <div className="w-full bg-slate-100/80 h-2 rounded-[3px] overflow-hidden flex border border-slate-200/20 shadow-inner">
+                        <div className="w-full bg-zinc-100/80 h-2 rounded-[3px] overflow-hidden flex border border-zinc-200/20 shadow-inner">
                           {sortKey === 'total' ? (
                             <div style={{ width: `${barPercent}%` }} className="flex h-full rounded-[3px] overflow-hidden">
                               {jogPercent > 0 && <div style={{ width: `${jogPercent}%`, backgroundColor: INTENSITY_COLORS.jog.hex }} />}
@@ -1761,7 +1761,7 @@ export default function StatsDashboard({
                       setShowAllRanking(true);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-100 text-slate-600 px-4 py-2.5 rounded-2xl text-xs font-black shadow-sm active:scale-95 transition-all"
+                  className="w-full flex items-center justify-center gap-1 bg-zinc-50 hover:bg-zinc-100 border border-zinc-100 text-zinc-600 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-sm active:scale-95 transition-all"
                 >
                   <span>{showAllRanking ? 'ランキングを閉じる' : `もっと見る (他 ${rankingData.length - 10} 名を表示)`}</span>
                   <ChevronDown size={14} className={`transition-transform duration-200 ${showAllRanking ? 'rotate-180' : ''}`} />
@@ -1781,13 +1781,13 @@ export default function StatsDashboard({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setRankingDetailMember('')}
-                className="flex items-center justify-center w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 text-blue-500 hover:text-blue-700 active:scale-95 transition-all shadow-sm shrink-0"
+                className="flex items-center justify-center w-10 h-10 rounded-2xl bg-blue-50 border border-blue-100 text-[#007aff] hover:text-blue-700 active:scale-95 transition-all shadow-sm shrink-0"
               >
                 <ChevronRight size={18} className="rotate-180" />
               </button>
               <div>
-                <span className="text-[9px] font-bold text-slate-400 block leading-none">メンバー</span>
-                <span className="text-base font-black text-slate-800 block mt-0.5 leading-none">{rankingDetailMember ? formatMemberName(rankingDetailMember) : ''}</span>
+                <span className="text-[10px] font-bold text-zinc-400 block leading-none">メンバー</span>
+                <span className="text-base font-bold text-zinc-800 block mt-0.5 leading-none">{rankingDetailMember ? formatMemberName(rankingDetailMember) : ''}</span>
               </div>
             </div>
             
@@ -1795,31 +1795,31 @@ export default function StatsDashboard({
               onClick={() => setShowMemberSheet(true)}
               aria-label="メンバーを切り替え"
               title="メンバーを切り替え"
-              className="flex items-center gap-1 bg-[#f2f2f7] text-slate-700 px-3.5 py-2.5 rounded-2xl text-xs font-black active:scale-95 transition-all"
+              className="flex items-center gap-1 bg-[#f2f2f7] text-zinc-700 px-3.5 py-2.5 rounded-2xl text-xs font-bold active:scale-95 transition-all"
             >
               <Users size={14} />
             </button>
           </div>
 
           {!rankingDetailMemberData ? (
-            <div className="text-center py-12 text-slate-400 font-bold text-xs border border-dashed border-slate-100 rounded-3xl bg-white shadow-sm">
+            <div className="text-center py-12 text-zinc-400 font-bold text-xs border border-dashed border-zinc-100 rounded-3xl bg-white shadow-sm">
               メンバーデータがありません
             </div>
           ) : (
             <div className="space-y-4">
               
               {/* ① 合計距離 & ドーナツグラフ */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+              <div className="bg-white border border-zinc-100 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 text-slate-400 mb-1">
-                    <Activity size={12} className="text-blue-500" />
-                    <span className="text-[9px] font-black uppercase tracking-wider">
+                  <div className="flex items-center gap-1 text-zinc-400 mb-1">
+                    <Activity size={12} className="text-[#007aff]" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       合計
                     </span>
                   </div>
-                  <p className="text-3xl font-black text-slate-800 leading-none">
+                  <p className="text-3xl font-bold text-zinc-800 leading-none">
                     {rankingDetailMemberData.total}
-                    <span className="text-sm text-slate-400 font-bold ml-1">km</span>
+                    <span className="text-sm text-zinc-400 font-bold ml-1">km</span>
                   </p>
                   
                   {/* 強度凡例リスト */}
@@ -1833,8 +1833,8 @@ export default function StatsDashboard({
                       return (
                         <div key={key} className="flex items-center gap-1.5 text-[10px] font-bold">
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.hex }} />
-                          <span className="text-slate-500 block truncate max-w-[80px]">{item.name.split(' (')[0]}</span>
-                          <span className="font-black text-slate-800 ml-auto">{val}km <span className="text-[8px] text-slate-400 font-medium ml-0.5">({percent}%)</span></span>
+                          <span className="text-zinc-500 block truncate max-w-[80px]">{item.name.split(' (')[0]}</span>
+                          <span className="font-bold text-zinc-800 ml-auto">{val}km <span className="text-[10px] text-zinc-400 font-medium ml-0.5">({percent}%)</span></span>
                         </div>
                       );
                     })}
@@ -1867,10 +1867,10 @@ export default function StatsDashboard({
                   </svg>
                   
                   <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-[7px] text-slate-400 font-black leading-none uppercase tracking-widest">
+                    <span className="text-[7px] text-zinc-400 font-bold leading-none uppercase tracking-widest">
                       TOTAL
                     </span>
-                    <span className="text-base font-black text-slate-800 mt-1 leading-none">
+                    <span className="text-base font-bold text-zinc-800 mt-1 leading-none">
                       {Math.round(rankingDetailMemberData.total)}
                     </span>
                   </div>
@@ -1888,20 +1888,20 @@ export default function StatsDashboard({
               )}
 
               {/* ② 直近7日間の日次アクティビティグラフ */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
+              <div className="bg-white border border-zinc-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
                     直近7日間の日次走行距離 (総距離)
                   </h4>
                 </div>
                 
                 <div className="h-36 w-full relative flex items-end justify-between px-1 pt-5 pb-1">
-                  <div className="absolute inset-x-0 bottom-6 h-px bg-slate-100 z-0" />
+                  <div className="absolute inset-x-0 bottom-6 h-px bg-zinc-100 z-0" />
                   {rankingDetailDailyScale.ticks.map((tick, idx) => {
                     const bottomPercent = 24 + ((tick / rankingDetailDailyScale.limit) * 80);
                     return (
-                      <div key={idx} className="absolute inset-x-0 border-t border-dashed border-slate-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
-                        <span className="absolute -top-1.5 left-0 text-[7px] font-black text-slate-400 bg-white pr-1 leading-none">{tick}</span>
+                      <div key={idx} className="absolute inset-x-0 border-t border-dashed border-zinc-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
+                        <span className="absolute -top-1.5 left-0 text-[7px] font-bold text-zinc-400 bg-white pr-1 leading-none">{tick}</span>
                       </div>
                     );
                   })}
@@ -1925,13 +1925,13 @@ export default function StatsDashboard({
                           className="flex flex-col items-center flex-1 h-full justify-end relative focus:outline-none animate-fade-in"
                         >
                           {targetVal > 0 && (
-                            <span className={`text-[8px] font-black mb-0.5 block leading-none transition-colors ${isActive ? 'text-blue-600 scale-110' : 'text-slate-700'}`}>{targetVal}</span>
+                            <span className={`text-[10px] font-bold mb-0.5 block leading-none transition-colors ${isActive ? 'text-[#007aff] scale-110' : 'text-zinc-700'}`}>{targetVal}</span>
                           )}
                           
                           {targetVal > 0 ? (
                             <div 
-                              className={`w-4.5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-slate-50 border shadow-sm transition-all duration-200 ${
-                                isActive ? 'ring-2 ring-blue-500/50 scale-105 border-blue-400' : 'border-slate-100'
+                              className={`w-4.5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-zinc-50 border shadow-sm transition-all duration-200 ${
+                                isActive ? 'ring-2 ring-[#007aff]/50 scale-105 border-[#007aff]' : 'border-zinc-100'
                               }`} 
                               style={{ height: `${barHeight}px` }}
                             >
@@ -1944,13 +1944,13 @@ export default function StatsDashboard({
                               </>
                             </div>
                           ) : (
-                            <div className="w-4.5 h-1 bg-slate-100 rounded-t-[3px] border border-slate-200" />
+                            <div className="w-4.5 h-1 bg-zinc-100 rounded-t-[3px] border border-zinc-200" />
                           )}
                           
                           <div className="h-6 flex flex-col justify-end items-center mt-1">
-                            <span className={`text-[8px] font-black block leading-none transition-colors ${isActive ? 'text-blue-600 font-extrabold' : 'text-slate-500'}`}>{day.label.split('/')[1]}</span>
+                            <span className={`text-[10px] font-bold block leading-none transition-colors ${isActive ? 'text-[#007aff] font-extrabold' : 'text-zinc-500'}`}>{day.label.split('/')[1]}</span>
                             <span className={`text-[7px] font-extrabold block leading-none mt-0.5 transition-colors ${
-                              isActive ? 'text-blue-600 font-extrabold' : (day.dayName === '日' ? 'text-red-500' : day.dayName === '土' ? 'text-blue-500' : 'text-slate-400')
+                              isActive ? 'text-[#007aff] font-extrabold' : (day.dayName === '日' ? 'text-red-500' : day.dayName === '土' ? 'text-[#007aff]' : 'text-zinc-400')
                             }`}>{day.dayName}</span>
                           </div>
                         </button>
@@ -1962,28 +1962,28 @@ export default function StatsDashboard({
                 {activeDailyIdx !== null && (
                   <div className="mt-3 p-3 rounded-2xl bg-blue-50/40 border border-blue-100/50 animate-fade-in">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-blue-800">
+                      <span className="text-[10px] font-bold text-blue-800">
                         📅 {rankingDetailWeeklyDailyActivity[activeDailyIdx].label} ({rankingDetailWeeklyDailyActivity[activeDailyIdx].dayName}) の走行内訳
                       </span>
-                      <span className="text-xs font-black text-blue-700">
+                      <span className="text-xs font-bold text-blue-700">
                         合計 {rankingDetailWeeklyDailyActivity[activeDailyIdx].total} km
                       </span>
                     </div>
                     {rankingDetailWeeklyDailyActivity[activeDailyIdx].total > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 text-[9px] font-bold justify-start">
+                      <div className="flex flex-wrap gap-1.5 text-[10px] font-bold justify-start">
                         {Object.entries(INTENSITY_COLORS).map(([key, item]) => {
                           const val = rankingDetailWeeklyDailyActivity[activeDailyIdx][key] || 0;
                           if (val <= 0) return null;
                           return (
-                            <div key={key} className="bg-white rounded-lg p-1.5 border border-slate-100 text-center min-w-[50px] flex-1">
-                              <span className="block text-slate-400">{item.name.split(' (')[0]}</span>
-                              <span className="block font-black mt-0.5" style={{ color: item.hex }}>{val}km</span>
+                            <div key={key} className="bg-white rounded-lg p-1.5 border border-zinc-100 text-center min-w-[50px] flex-1">
+                              <span className="block text-zinc-400">{item.name.split(' (')[0]}</span>
+                              <span className="block font-bold mt-0.5" style={{ color: item.hex }}>{val}km</span>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <p className="text-[9px] font-bold text-slate-400 text-center py-1">この日の走行記録はありません</p>
+                      <p className="text-[10px] font-bold text-zinc-400 text-center py-1">この日の走行記録はありません</p>
                     )}
                   </div>
                 )}
@@ -1991,20 +1991,20 @@ export default function StatsDashboard({
 
               {/* ③ 月別走行推移 */}
               {rankingDetailMemberData.trend.length > 0 && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
+                <div className="bg-white border border-zinc-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
                       月別走行推移 (過去6ヶ月, 総距離)
                     </h4>
                   </div>
                   
                   <div className="h-36 w-full relative flex items-end justify-between px-1 pt-5 pb-1">
-                    <div className="absolute inset-x-0 bottom-6 h-px bg-slate-100 z-0" />
+                    <div className="absolute inset-x-0 bottom-6 h-px bg-zinc-100 z-0" />
                     {rankingDetailMonthlyScale.ticks.map((tick, idx) => {
                       const bottomPercent = 24 + ((tick / rankingDetailMonthlyScale.limit) * 80);
                       return (
-                        <div key={idx} className="absolute inset-x-0 border-t border-dashed border-slate-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
-                          <span className="absolute -top-1.5 left-0 text-[7px] font-black text-slate-400 bg-white pr-1 leading-none">{tick}</span>
+                        <div key={idx} className="absolute inset-x-0 border-t border-dashed border-zinc-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
+                          <span className="absolute -top-1.5 left-0 text-[7px] font-bold text-zinc-400 bg-white pr-1 leading-none">{tick}</span>
                         </div>
                       );
                     })}
@@ -2028,12 +2028,12 @@ export default function StatsDashboard({
                             className="flex flex-col items-center flex-1 h-full justify-end relative focus:outline-none animate-fade-in"
                           >
                             {targetVal > 0 && (
-                              <span className={`text-[8px] font-black mb-0.5 block leading-none transition-colors ${isActive ? 'text-blue-600 scale-110' : 'text-slate-700'}`}>{targetVal}</span>
+                              <span className={`text-[10px] font-bold mb-0.5 block leading-none transition-colors ${isActive ? 'text-[#007aff] scale-110' : 'text-zinc-700'}`}>{targetVal}</span>
                             )}
                             
                             <div 
-                              className={`w-5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-slate-50 border shadow-sm transition-all duration-200 ${
-                                isActive ? 'ring-2 ring-blue-500/50 scale-105 border-blue-400' : 'border-slate-100'
+                              className={`w-5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-zinc-50 border shadow-sm transition-all duration-200 ${
+                                isActive ? 'ring-2 ring-[#007aff]/50 scale-105 border-[#007aff]' : 'border-zinc-100'
                               }`} 
                               style={{ height: `${barHeight}px` }}
                             >
@@ -2046,12 +2046,12 @@ export default function StatsDashboard({
                                   {jogHeight > 0   && <div style={{ height: `${jogHeight}%`,   backgroundColor: INTENSITY_COLORS.jog.hex }} />}
                                 </>
                               ) : (
-                                <div className="w-full h-full bg-slate-100/40" />
+                                <div className="w-full h-full bg-zinc-100/40" />
                               )}
                             </div>
                             
                             <div className="h-6 flex items-center justify-center mt-1">
-                              <span className={`text-[9px] font-black block leading-none transition-colors ${isActive ? 'text-blue-600 font-extrabold' : 'text-slate-500'}`}>{t.label}</span>
+                              <span className={`text-[10px] font-bold block leading-none transition-colors ${isActive ? 'text-[#007aff] font-extrabold' : 'text-zinc-500'}`}>{t.label}</span>
                             </div>
                           </button>
                         );
@@ -2062,28 +2062,28 @@ export default function StatsDashboard({
                   {activeMonthIdx !== null && (
                     <div className="mt-3 p-3 rounded-2xl bg-blue-50/40 border border-blue-100/50 animate-fade-in">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-black text-blue-800">
+                        <span className="text-[10px] font-bold text-blue-800">
                           📅 {rankingDetailMemberData.trend[activeMonthIdx].label} の走行内訳
                         </span>
-                        <span className="text-xs font-black text-blue-700">
+                        <span className="text-xs font-bold text-blue-700">
                           合計 {rankingDetailMemberData.trend[activeMonthIdx].total} km
                         </span>
                       </div>
                       {rankingDetailMemberData.trend[activeMonthIdx].total > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 text-[9px] font-bold justify-start">
+                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold justify-start">
                           {Object.entries(INTENSITY_COLORS).map(([key, item]) => {
                             const val = rankingDetailMemberData.trend[activeMonthIdx][key] || 0;
                             if (val <= 0) return null;
                             return (
-                              <div key={key} className="bg-white rounded-lg p-1.5 border border-slate-100 text-center min-w-[50px] flex-1">
-                                <span className="block text-slate-400">{item.name.split(' (')[0]}</span>
-                                <span className="block font-black mt-0.5" style={{ color: item.hex }}>{val}km</span>
+                              <div key={key} className="bg-white rounded-lg p-1.5 border border-zinc-100 text-center min-w-[50px] flex-1">
+                                <span className="block text-zinc-400">{item.name.split(' (')[0]}</span>
+                                <span className="block font-bold mt-0.5" style={{ color: item.hex }}>{val}km</span>
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <p className="text-[9px] font-bold text-slate-400 text-center py-1">この月の走行記録はありません</p>
+                        <p className="text-[10px] font-bold text-zinc-400 text-center py-1">この月の走行記録はありません</p>
                       )}
                     </div>
                   )}
@@ -2092,11 +2092,11 @@ export default function StatsDashboard({
 
               {/* ④ 練習履歴タイムライン */}
               <div className="space-y-3">
-                <h4 className="text-[11px] font-black text-slate-500 px-1 block">履歴</h4>
+                <h4 className="text-[11px] font-bold text-zinc-500 px-1 block">履歴</h4>
                 
-                <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
+                <div className="relative pl-3.5 border-l border-zinc-200 space-y-3.5 ml-2.5">
                   {rankingDetailMemberData.daily.filter(hasTimelineContent).length === 0 ? (
-                    <div className="text-center py-6 text-slate-400 text-xs font-bold border border-dashed border-slate-100 rounded-2xl bg-white shadow-sm">
+                    <div className="text-center py-6 text-zinc-400 text-xs font-bold border border-dashed border-zinc-100 rounded-2xl bg-white shadow-sm">
                       活動タイムラインの記録がありません
                     </div>
                   ) : (
@@ -2107,20 +2107,20 @@ export default function StatsDashboard({
                       
                       return (
                         <div key={i} className="relative group animate-fade-in" style={{ animationDelay: `${i * 0.04}s` }}>
-                          <div className="absolute -left-[20.5px] top-2 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-500 shadow-sm group-hover:scale-125 transition-transform" />
+                          <div className="absolute -left-[20.5px] top-2 w-2.5 h-2.5 rounded-full bg-white border-2 border-[#007aff] shadow-sm group-hover:scale-125 transition-transform" />
                           
-                          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 space-y-2.5 relative shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-slate-200/60 transition-all">
-                            <div className="absolute -left-[5px] top-3 w-2 h-2 bg-white border-l border-b border-slate-100 transform rotate-45" />
+                          <div className="bg-white border border-zinc-100 rounded-3xl p-3.5 space-y-2.5 relative shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-zinc-200/60 transition-all">
+                            <div className="absolute -left-[5px] top-3 w-2 h-2 bg-white border-l border-b border-zinc-100 transform rotate-45" />
                             
-                            <div className="flex justify-between items-center text-[10px] font-black text-slate-400 relative z-10">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 relative z-10">
                               <span>{dateText}</span>
-                              <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider shadow-sm">
+                              <span className="text-[#007aff] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider shadow-sm">
                                 {rec.total} km
                               </span>
                             </div>
                             
                             {hasMetrics && (
-                              <div className="h-1 bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/10 shadow-inner">
+                              <div className="h-1 bg-zinc-100 rounded-full overflow-hidden flex border border-zinc-200/10 shadow-inner">
                                 <>
                                   {rec.jog > 0 && <div style={{ width: `${(rec.jog/rec.total)*100}%`, backgroundColor: INTENSITY_COLORS.jog.hex }} />}
                                   {rec.mlt > 0 && <div style={{ width: `${(rec.mlt/rec.total)*100}%`, backgroundColor: INTENSITY_COLORS.mlt.hex }} />}
@@ -2135,8 +2135,8 @@ export default function StatsDashboard({
 
                             <div className="space-y-2 relative z-10 text-xs">
                               {rec.menu && (
-                                <p className="text-slate-700 font-extrabold leading-snug">
-                                  <span className="text-[9px] text-slate-400 font-black mr-1">メニュー</span>
+                                <p className="text-zinc-700 font-extrabold leading-snug">
+                                  <span className="text-[10px] text-zinc-400 font-bold mr-1">メニュー</span>
                                   {rec.menu}
                                 </p>
                               )}
@@ -2160,7 +2160,7 @@ export default function StatsDashboard({
         <div className="space-y-4">
           
           {/* メンバー表示行（iOS設定アプリ風: 行全体タップで人選択シートが開く。記録入力はFABに移管） */}
-          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-20 bg-[#f8fafc] pt-2.5 pb-1">
+          <div className="sticky top-[calc(env(safe-area-inset-top,0px)+52px)] z-20 bg-[#f2f2f7] pt-2.5 pb-1">
             <button
               onClick={() => setShowMemberSheet(true)}
               aria-label="メンバーを切り替え"
@@ -2175,25 +2175,25 @@ export default function StatsDashboard({
           </div>
 
           {!selectedMemberData ? (
-            <div className="text-center py-14 text-slate-400 font-bold text-xs border border-dashed border-slate-100 rounded-3xl bg-white shadow-sm">
-              <User size={28} className="mx-auto mb-3 text-slate-300" />
-              <p className="text-slate-500 text-sm font-black">部員を選択してください</p>
+            <div className="text-center py-14 text-zinc-400 font-bold text-xs border border-dashed border-zinc-100 rounded-3xl bg-white shadow-sm">
+              <User size={28} className="mx-auto mb-3 text-zinc-300" />
+              <p className="text-zinc-500 text-sm font-bold">部員を選択してください</p>
             </div>
           ) : (
             <div className="space-y-4">
               
               {/* ① 合計距離 & ドーナツグラフ (ライト・プレミアム) */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
+              <div className="bg-white border border-zinc-100 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-[0_8px_30px_rgba(0,0,0,0.015)]">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 text-slate-400 mb-1">
-                    <Activity size={12} className="text-blue-500" />
-                    <span className="text-[9px] font-black uppercase tracking-wider">
+                  <div className="flex items-center gap-1 text-zinc-400 mb-1">
+                    <Activity size={12} className="text-[#007aff]" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
                       {sortKey === 'total' ? '合計' : INTENSITY_COLORS[sortKey].name.split(' (')[0]}
                     </span>
                   </div>
-                  <p className="text-3xl font-black text-slate-800 leading-none">
+                  <p className="text-3xl font-bold text-zinc-800 leading-none">
                     {sortKey === 'total' ? selectedMemberData.total : selectedMemberData[sortKey]}
-                    <span className="text-sm text-slate-400 font-bold ml-1">km</span>
+                    <span className="text-sm text-zinc-400 font-bold ml-1">km</span>
                   </p>
                   
                   {/* 強度凡例リスト (高さを完全に固定するため常に全5項目を表示し、選択中の項目以外は透過度を下げてフォーカスを表現) */}
@@ -2219,8 +2219,8 @@ export default function StatsDashboard({
                           }`}
                         >
                           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.hex }} />
-                          <span className="text-slate-500 block truncate max-w-[80px]">{item.name.split(' (')[0]}</span>
-                          <span className="font-black text-slate-800 ml-auto">{val}km <span className="text-[8px] text-slate-400 font-medium ml-0.5">({percent}%)</span></span>
+                          <span className="text-zinc-500 block truncate max-w-[80px]">{item.name.split(' (')[0]}</span>
+                          <span className="font-bold text-zinc-800 ml-auto">{val}km <span className="text-[10px] text-zinc-400 font-medium ml-0.5">({percent}%)</span></span>
                         </div>
                       );
                     })}
@@ -2253,10 +2253,10 @@ export default function StatsDashboard({
                   </svg>
                   
                   <div className="absolute flex flex-col items-center justify-center">
-                    <span className="text-[7px] text-slate-400 font-black leading-none uppercase tracking-widest">
+                    <span className="text-[7px] text-zinc-400 font-bold leading-none uppercase tracking-widest">
                       {sortKey === 'total' ? 'TOTAL' : sortKey.toUpperCase()}
                     </span>
-                    <span className="text-base font-black text-slate-800 mt-1 leading-none">
+                    <span className="text-base font-bold text-zinc-800 mt-1 leading-none">
                       {Math.round(sortKey === 'total' ? selectedMemberData.total : (selectedMemberData[sortKey] || 0))}
                     </span>
                   </div>
@@ -2274,21 +2274,21 @@ export default function StatsDashboard({
               )}
 
               {/* ② 【新規】直近7日間の日次アクティビティグラフ (曜日別絶対スケール表示) */}
-              <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
+              <div className="bg-white border border-zinc-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                  <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
                     直近7日間の日次走行距離 ({sortKey === 'total' ? '総距離' : INTENSITY_COLORS[sortKey].name.split(' (')[0]})
                   </h4>
                 </div>
                 
                 <div className="h-36 w-full relative flex items-end justify-between px-1 pt-5 pb-1">
                   {/* 横軸グリッド線 & Y軸目盛り */}
-                  <div className="absolute inset-x-0 bottom-6 h-px bg-slate-100 z-0" />
+                  <div className="absolute inset-x-0 bottom-6 h-px bg-zinc-100 z-0" />
                   {dailyScale.ticks.map((tick, idx) => {
                     const bottomPercent = 24 + ((tick / dailyScale.limit) * 80); // Y軸目盛りの配置
                     return (
-                      <div key={idx} className="absolute inset-x-0 border-t border-dashed border-slate-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
-                        <span className="absolute -top-1.5 left-0 text-[7px] font-black text-slate-400 bg-white pr-1 leading-none">{tick}</span>
+                      <div key={idx} className="absolute inset-x-0 border-t border-dashed border-zinc-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
+                        <span className="absolute -top-1.5 left-0 text-[7px] font-bold text-zinc-400 bg-white pr-1 leading-none">{tick}</span>
                       </div>
                     );
                   })}
@@ -2314,14 +2314,14 @@ export default function StatsDashboard({
                         >
                           {/* 棒の上の数値表示 */}
                           {targetVal > 0 && (
-                            <span className={`text-[8px] font-black mb-0.5 block leading-none transition-colors ${isActive ? 'text-blue-600 scale-110' : 'text-slate-700'}`}>{targetVal}</span>
+                            <span className={`text-[10px] font-bold mb-0.5 block leading-none transition-colors ${isActive ? 'text-[#007aff] scale-110' : 'text-zinc-700'}`}>{targetVal}</span>
                           )}
                           
                           {/* 物理積層バー */}
                           {targetVal > 0 ? (
                             <div 
-                              className={`w-4.5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-slate-50 border shadow-sm transition-all duration-200 ${
-                                isActive ? 'ring-2 ring-blue-500/50 scale-105 border-blue-400' : 'border-slate-100'
+                              className={`w-4.5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-zinc-50 border shadow-sm transition-all duration-200 ${
+                                isActive ? 'ring-2 ring-[#007aff]/50 scale-105 border-[#007aff]' : 'border-zinc-100'
                               }`} 
                               style={{ height: `${barHeight}px` }}
                             >
@@ -2338,14 +2338,14 @@ export default function StatsDashboard({
                               )}
                             </div>
                           ) : (
-                            <div className="w-4.5 h-1 bg-slate-100 rounded-t-[3px] border border-slate-200" />
+                            <div className="w-4.5 h-1 bg-zinc-100 rounded-t-[3px] border border-zinc-200" />
                           )}
                           
                           {/* 下部日付ラベル */}
                           <div className="h-6 flex flex-col justify-end items-center mt-1">
-                            <span className={`text-[8px] font-black block leading-none transition-colors ${isActive ? 'text-blue-600 font-extrabold' : 'text-slate-500'}`}>{day.label.split('/')[1]}</span>
+                            <span className={`text-[10px] font-bold block leading-none transition-colors ${isActive ? 'text-[#007aff] font-extrabold' : 'text-zinc-500'}`}>{day.label.split('/')[1]}</span>
                             <span className={`text-[7px] font-extrabold block leading-none mt-0.5 transition-colors ${
-                              isActive ? 'text-blue-600 font-extrabold' : (day.dayName === '日' ? 'text-red-500' : day.dayName === '土' ? 'text-blue-500' : 'text-slate-400')
+                              isActive ? 'text-[#007aff] font-extrabold' : (day.dayName === '日' ? 'text-red-500' : day.dayName === '土' ? 'text-[#007aff]' : 'text-zinc-400')
                             }`}>{day.dayName}</span>
                           </div>
                         </button>
@@ -2358,30 +2358,30 @@ export default function StatsDashboard({
                 {activeDailyIdx !== null && (
                   <div className="mt-3 p-3 rounded-2xl bg-blue-50/40 border border-blue-100/50 animate-fade-in">
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-[10px] font-black text-blue-800">
+                      <span className="text-[10px] font-bold text-blue-800">
                         📅 {weeklyDailyActivity[activeDailyIdx].label} ({weeklyDailyActivity[activeDailyIdx].dayName}) の走行内訳
                       </span>
-                      <span className="text-xs font-black text-blue-700">
+                      <span className="text-xs font-bold text-blue-700">
                         合計 {sortKey === 'total' ? weeklyDailyActivity[activeDailyIdx].total : weeklyDailyActivity[activeDailyIdx][sortKey]} km
                         {sortKey !== 'total' && ` (総距離: ${weeklyDailyActivity[activeDailyIdx].total}km)`}
                       </span>
                     </div>
                     {weeklyDailyActivity[activeDailyIdx].total > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 text-[9px] font-bold justify-start">
+                      <div className="flex flex-wrap gap-1.5 text-[10px] font-bold justify-start">
                         {Object.entries(INTENSITY_COLORS).map(([key, item]) => {
                           const val = weeklyDailyActivity[activeDailyIdx][key] || 0;
                           if (val <= 0) return null;
                           if (sortKey !== 'total' && sortKey !== key) return null;
                           return (
-                            <div key={key} className="bg-white rounded-lg p-1.5 border border-slate-100 text-center min-w-[50px] flex-1">
-                              <span className="block text-slate-400">{item.name.split(' (')[0]}</span>
-                              <span className="block font-black mt-0.5" style={{ color: item.hex }}>{val}km</span>
+                            <div key={key} className="bg-white rounded-lg p-1.5 border border-zinc-100 text-center min-w-[50px] flex-1">
+                              <span className="block text-zinc-400">{item.name.split(' (')[0]}</span>
+                              <span className="block font-bold mt-0.5" style={{ color: item.hex }}>{val}km</span>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <p className="text-[9px] font-bold text-slate-400 text-center py-1">この日の走行記録はありません</p>
+                      <p className="text-[10px] font-bold text-zinc-400 text-center py-1">この日の走行記録はありません</p>
                     )}
                   </div>
                 )}
@@ -2389,21 +2389,21 @@ export default function StatsDashboard({
 
               {/* ③ 月別走行推移 (直近6ヶ月・絶対目盛り安定) */}
               {selectedMemberData.trend.length > 0 && (
-                <div className="bg-white border border-slate-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
+                <div className="bg-white border border-zinc-100 rounded-3xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.015)] space-y-3">
                   <div className="flex items-center justify-between">
-                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">
+                    <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">
                       月別走行推移 (過去6ヶ月, {sortKey === 'total' ? '総距離' : INTENSITY_COLORS[sortKey].name.split(' (')[0]})
                     </h4>
                   </div>
                   
                   <div className="h-36 w-full relative flex items-end justify-between px-1 pt-5 pb-1">
                     {/* 横軸 & Y軸目盛り */}
-                    <div className="absolute inset-x-0 bottom-6 h-px bg-slate-100 z-0" />
+                    <div className="absolute inset-x-0 bottom-6 h-px bg-zinc-100 z-0" />
                     {monthlyScale.ticks.map((tick, idx) => {
                       const bottomPercent = 24 + ((tick / monthlyScale.limit) * 80);
                       return (
-                        <div key={idx} className="absolute inset-x-0 border-t border-dashed border-slate-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
-                          <span className="absolute -top-1.5 left-0 text-[7px] font-black text-slate-400 bg-white pr-1 leading-none">{tick}</span>
+                        <div key={idx} className="absolute inset-x-0 border-t border-dashed border-zinc-100/80 z-0" style={{ bottom: `${bottomPercent}px` }}>
+                          <span className="absolute -top-1.5 left-0 text-[7px] font-bold text-zinc-400 bg-white pr-1 leading-none">{tick}</span>
                         </div>
                       );
                     })}
@@ -2427,13 +2427,13 @@ export default function StatsDashboard({
                             className="flex flex-col items-center flex-1 h-full justify-end relative focus:outline-none animate-fade-in"
                           >
                             {targetVal > 0 && (
-                              <span className={`text-[8px] font-black mb-0.5 block leading-none transition-colors ${isActive ? 'text-blue-600 scale-110' : 'text-slate-700'}`}>{targetVal}</span>
+                              <span className={`text-[10px] font-bold mb-0.5 block leading-none transition-colors ${isActive ? 'text-[#007aff] scale-110' : 'text-zinc-700'}`}>{targetVal}</span>
                             )}
                             
                             {/* 積層バー */}
                             <div 
-                              className={`w-5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-slate-50 border shadow-sm transition-all duration-200 ${
-                                isActive ? 'ring-2 ring-blue-500/50 scale-105 border-blue-400' : 'border-slate-100'
+                              className={`w-5 rounded-t-[3px] overflow-hidden flex flex-col justify-end bg-zinc-50 border shadow-sm transition-all duration-200 ${
+                                isActive ? 'ring-2 ring-[#007aff]/50 scale-105 border-[#007aff]' : 'border-zinc-100'
                               }`} 
                               style={{ height: `${barHeight}px` }}
                             >
@@ -2449,13 +2449,13 @@ export default function StatsDashboard({
                                   <div className="w-full h-full animate-fade-in" style={{ backgroundColor: INTENSITY_COLORS[sortKey].hex }} />
                                 )
                               ) : (
-                                <div className="w-full h-full bg-slate-100/40" />
+                                <div className="w-full h-full bg-zinc-100/40" />
                               )}
                             </div>
                             
                             {/* 下部ラベル */}
                             <div className="h-6 flex items-center justify-center mt-1">
-                              <span className={`text-[9px] font-black block leading-none transition-colors ${isActive ? 'text-blue-600 font-extrabold' : 'text-slate-500'}`}>{t.label}</span>
+                              <span className={`text-[10px] font-bold block leading-none transition-colors ${isActive ? 'text-[#007aff] font-extrabold' : 'text-zinc-500'}`}>{t.label}</span>
                             </div>
                           </button>
                         );
@@ -2467,30 +2467,30 @@ export default function StatsDashboard({
                   {activeMonthIdx !== null && (
                     <div className="mt-3 p-3 rounded-2xl bg-blue-50/40 border border-blue-100/50 animate-fade-in">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-black text-blue-800">
+                        <span className="text-[10px] font-bold text-blue-800">
                           📅 {selectedMemberData.trend[activeMonthIdx].label} の走行内訳
                         </span>
-                        <span className="text-xs font-black text-blue-700">
+                        <span className="text-xs font-bold text-blue-700">
                           合計 {sortKey === 'total' ? selectedMemberData.trend[activeMonthIdx].total : selectedMemberData.trend[activeMonthIdx][sortKey]} km
                           {sortKey !== 'total' && ` (総距離: ${selectedMemberData.trend[activeMonthIdx].total}km)`}
                         </span>
                       </div>
                       {selectedMemberData.trend[activeMonthIdx].total > 0 ? (
-                        <div className="flex flex-wrap gap-1.5 text-[9px] font-bold justify-start">
+                        <div className="flex flex-wrap gap-1.5 text-[10px] font-bold justify-start">
                           {Object.entries(INTENSITY_COLORS).map(([key, item]) => {
                             const val = selectedMemberData.trend[activeMonthIdx][key] || 0;
                             if (val <= 0) return null;
                             if (sortKey !== 'total' && sortKey !== key) return null;
                             return (
-                              <div key={key} className="bg-white rounded-lg p-1.5 border border-slate-100 text-center min-w-[50px] flex-1">
-                                <span className="block text-slate-400">{item.name.split(' (')[0]}</span>
-                                <span className="block font-black mt-0.5" style={{ color: item.hex }}>{val}km</span>
+                              <div key={key} className="bg-white rounded-lg p-1.5 border border-zinc-100 text-center min-w-[50px] flex-1">
+                                <span className="block text-zinc-400">{item.name.split(' (')[0]}</span>
+                                <span className="block font-bold mt-0.5" style={{ color: item.hex }}>{val}km</span>
                               </div>
                             );
                           })}
                         </div>
                       ) : (
-                        <p className="text-[9px] font-bold text-slate-400 text-center py-1">この月の走行記録はありません</p>
+                        <p className="text-[10px] font-bold text-zinc-400 text-center py-1">この月の走行記録はありません</p>
                       )}
                     </div>
                   )}
@@ -2499,11 +2499,11 @@ export default function StatsDashboard({
 
               {/* ④ 練習履歴タイムライン (チャット吹き出し・クリーンUI) */}
               <div className="space-y-3">
-                <h4 className="text-[11px] font-black text-slate-500 px-1 block">履歴</h4>
+                <h4 className="text-[11px] font-bold text-zinc-500 px-1 block">履歴</h4>
                 
-                <div className="relative pl-3.5 border-l border-slate-200 space-y-3.5 ml-2.5">
+                <div className="relative pl-3.5 border-l border-zinc-200 space-y-3.5 ml-2.5">
                   {selectedMemberData.daily.filter(hasTimelineContent).length === 0 ? (
-                    <div className="text-center py-6 text-slate-400 text-xs font-bold border border-dashed border-slate-100 rounded-2xl bg-white shadow-sm">
+                    <div className="text-center py-6 text-zinc-400 text-xs font-bold border border-dashed border-zinc-100 rounded-2xl bg-white shadow-sm">
                       活動タイムラインの記録がありません
                     </div>
                   ) : (
@@ -2514,27 +2514,27 @@ export default function StatsDashboard({
                       return (
                         <div key={i} className="relative group animate-fade-in" style={{ animationDelay: `${i * 0.04}s` }}>
                           {/* タイムラインのノード点 (ライトネオンカラー) */}
-                          <div className="absolute -left-[20.5px] top-2 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-500 shadow-sm group-hover:scale-125 transition-transform" />
+                          <div className="absolute -left-[20.5px] top-2 w-2.5 h-2.5 rounded-full bg-white border-2 border-[#007aff] shadow-sm group-hover:scale-125 transition-transform" />
                           
                           {/* チャット風の吹き出し (純白・微細シャドウ) */}
-                          <div className="bg-white border border-slate-100 rounded-3xl p-3.5 space-y-2.5 relative shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-slate-200/60 transition-all">
+                          <div className="bg-white border border-zinc-100 rounded-3xl p-3.5 space-y-2.5 relative shadow-[0_2px_12px_rgba(0,0,0,0.01)] hover:border-zinc-200/60 transition-all">
                             {/* 吹き出しの三角ツノ */}
-                            <div className="absolute -left-[5px] top-3 w-2 h-2 bg-white border-l border-b border-slate-100 transform rotate-45" />
+                            <div className="absolute -left-[5px] top-3 w-2 h-2 bg-white border-l border-b border-zinc-100 transform rotate-45" />
                             
                             {/* 日付・走行距離のヘッダー */}
-                            <div className="flex justify-between items-center text-[10px] font-black text-slate-400 relative z-10">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 relative z-10">
                               <span>{dateText}</span>
-                              <span className="text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider shadow-sm">
+                              <span className="text-[#007aff] bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider shadow-sm">
                                 {sortKey === 'total' ? rec.total : (rec[sortKey] || 0)} km
                                 {sortKey !== 'total' && (
-                                  <span className="text-[7px] text-slate-400 font-bold ml-1">/ {rec.total}km</span>
+                                  <span className="text-[7px] text-zinc-400 font-bold ml-1">/ {rec.total}km</span>
                                 )}
                               </span>
                             </div>
                             
                             {/* 強度割合メーター (細いカラーバー) */}
                             {hasMetrics && (
-                              <div className="h-1 bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/10 shadow-inner">
+                              <div className="h-1 bg-zinc-100 rounded-full overflow-hidden flex border border-zinc-200/10 shadow-inner">
                                 {sortKey === 'total' ? (
                                   <>
                                     {rec.jog > 0 && <div style={{ width: `${(rec.jog/rec.total)*100}%`, backgroundColor: INTENSITY_COLORS.jog.hex }} />}
@@ -2554,8 +2554,8 @@ export default function StatsDashboard({
                             {/* 練習メニュー */}
                             <div className="space-y-2 relative z-10 text-xs">
                               {rec.menu && (
-                                <p className="text-slate-700 font-extrabold leading-snug">
-                                  <span className="text-[9px] text-slate-400 font-black mr-1">メニュー</span>
+                                <p className="text-zinc-700 font-extrabold leading-snug">
+                                  <span className="text-[10px] text-zinc-400 font-bold mr-1">メニュー</span>
                                   {rec.menu}
                                 </p>
                               )}
@@ -2578,7 +2578,7 @@ export default function StatsDashboard({
       {showSection === '__disabled__' && rankingDetailMember && (
         <button
           onClick={() => setRankingDetailMember('')}
-          className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white pl-4 pr-4.5 py-3 rounded-full shadow-[0_8px_30px_rgba(15,23,42,0.3)] active:scale-95 transition-all font-black text-xs border border-slate-700/20 active:bg-slate-900 cursor-pointer animate-fade-in"
+          className="fixed bottom-24 right-4.5 z-40 flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-900 text-white pl-4 pr-4.5 py-3 rounded-full shadow-[0_8px_30px_rgba(15,23,42,0.3)] active:scale-95 transition-all font-bold text-xs border border-zinc-700/20 active:bg-zinc-900 cursor-pointer animate-fade-in"
         >
           <ChevronRight size={14} className="rotate-180 shrink-0" />
           <span>戻る</span>
@@ -2590,7 +2590,7 @@ export default function StatsDashboard({
         <>
           {/* 黒背景オーバーレイ */}
           <div 
-            className="fixed inset-0 bg-slate-900/40 z-45 backdrop-blur-sm"
+            className="fixed inset-0 bg-zinc-900/40 z-45 backdrop-blur-sm"
             style={{
               opacity: isClosing ? 0 : 1,
               transition: 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -2600,7 +2600,7 @@ export default function StatsDashboard({
           
           {/* シート本体 */}
           <div 
-            className={`fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-[#f2f2f7] rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden pb-safe ${
+            className={`fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-tranzinc-x-1/2 md:-tranzinc-y-1/2 w-full md:w-[420px] h-[480px] max-h-[85vh] bg-[#f2f2f7] rounded-t-[32px] md:rounded-[32px] z-50 shadow-[0_-12px_40px_rgba(0,0,0,0.08)] md:shadow-[0_12px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden pb-safe ${
               isClosing ? '' : 'animate-slide-up md:animate-fade-in'
             }`}
             style={{
@@ -2613,7 +2613,7 @@ export default function StatsDashboard({
           >
             {/* ハンドルバー (モバイルのみ表示 - タッチドラッグで閉じるエリア) */}
             <div 
-              className="w-12 h-1 bg-slate-200 rounded-full mx-auto my-3.5 shrink-0 md:hidden cursor-grab active:cursor-grabbing"
+              className="w-12 h-1 bg-zinc-200 rounded-full mx-auto my-3.5 shrink-0 md:hidden cursor-grab active:cursor-grabbing"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -2621,7 +2621,7 @@ export default function StatsDashboard({
             
             {/* ヘッダー - タッチドラッグで閉じるエリア */}
             <div 
-              className="px-5 py-4 flex justify-between items-center border-b border-slate-50 shrink-0 select-none cursor-grab active:cursor-grabbing"
+              className="px-5 py-4 flex justify-between items-center border-b border-zinc-50 shrink-0 select-none cursor-grab active:cursor-grabbing"
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
@@ -2659,7 +2659,7 @@ export default function StatsDashboard({
                 const filtered = members.filter(m => !modalGrade || getGradeFromName(m.name) === modalGrade);
                 if (filtered.length === 0) {
                   return (
-                    <div className="col-span-2 text-center py-8 text-slate-400 text-xs font-bold">
+                    <div className="col-span-2 text-center py-8 text-zinc-400 text-xs font-bold">
                       該当するメンバーがいません
                     </div>
                   );
